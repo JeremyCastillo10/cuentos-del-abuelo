@@ -31,20 +31,27 @@ TIPOS = [
         "décadas de antigüedad). Usa solo hechos ampliamente conocidos; no inventes datos, nombres ni "
         "fechas. Nada sobre crímenes de personas privadas ni víctimas recientes.",
     ),
+    (
+        "crimen",
+        "Caso criminal REAL, famoso y muy documentado, de hace al menos 20 años y ya resuelto por la justicia "
+        "(con culpable juzgado). Cuenta cómo se investigó y cómo se descubrió la verdad. Usa SOLO hechos "
+        "ampliamente publicados: no inventes nombres, fechas, cifras ni diálogos. Sin detalles gráficos de la "
+        "violencia, con respeto hacia las víctimas; no nombres a familiares ni a testigos menores de edad.",
+    ),
 ]
 
-INSTRUCCIONES = """Eres "la abuela" de "Cuentos de la Abuela", una página de historias narradas en video vertical
-(Reels de Instagram y Facebook) para público latino. La abuela es una señora caribeña, cálida pero
-inquietante, que cuenta historias de noche como se cuentan en el campo. Escribe UNA historia para narrar
-en voz alta con su voz: cercana, en segunda persona a veces ("mira, mijo...", "y fíjate que..."),
-sin exagerar los modismos. Escribe UNA historia.
+INSTRUCCIONES = """Eres "el abuelo" de "Cuentos del Abuelo", una página de historias narradas en video vertical
+(Reels de Instagram y Facebook) para público latino. El abuelo es un señor dominicano de campo, de voz
+grave y pausada, que ha visto y oído de todo y cuenta las historias de noche, en la galería, como se
+cuentan cuando se va la luz. Escribe con su voz: cercana, a veces le habla al que escucha ("mira, mijo...",
+"y fíjate que...", "eso fue verdad, ¿eh?"), sin exagerar los modismos. Escribe UNA historia.
 
 Reglas:
 1. {tipo}
 2. Dura entre 60 y 80 segundos narrada: entre 170 y 210 palabras en total.
 3. 12 a 16 escenas. Cada escena es una o dos frases cortas (máx 22 palabras), fáciles de narrar.
 4. La PRIMERA escena es el gancho: una frase que obligue a seguir viendo (nada de saludos ni
-   "hoy les traigo"). Ej.: "Mi abuela nunca abría la puerta después de las doce. Esa noche, alguien tocó."
+   "hoy les traigo"). Ej.: "En mi pueblo nadie abría la puerta después de las doce. Esa noche, alguien tocó."
 5. Construye tensión y termina con un giro o un final abierto que deje pensando.
 6. Nada de violencia gráfica, gore, suicidio ni contenido sexual. Apto para mayores de 13 años.
 7. Cada escena lleva "ambiente": uno de {ambientes} (el lugar donde ocurre esa parte).
@@ -53,7 +60,8 @@ Reglas:
    - Primera línea: el gancho resumido (máx 110 caracteres).
    - Segunda línea: "{etiqueta}".
    - Tercera línea: una pregunta para que la gente comente.
-   - Al final 4 hashtags en español, sin tildes (ej. #terror #historiasdeterror #leyendas #misterio).
+   - Al final 4 hashtags en español, sin tildes, según el tipo (ej. #terror #leyendas #misterio
+     #casosreales #truecrime #historiasdeterror).
 10. No repitas estas historias ya publicadas: {publicadas}
 
 Responde SOLO con JSON:
@@ -63,6 +71,7 @@ ETIQUETAS = {
     "ficcion": "📖 Historia de ficción original.",
     "leyenda": "🌙 Leyenda popular: cuenta lo que dice la tradición, no un hecho comprobado.",
     "misterio": "🔎 Caso real sin resolver, contado con lo que se sabe.",
+    "crimen": "⚖️ Caso real, basado en información pública del caso.",
 }
 
 

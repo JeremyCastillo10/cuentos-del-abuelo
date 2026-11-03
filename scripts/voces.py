@@ -1,4 +1,4 @@
-"""Narra cada escena con Google Cloud TTS (voz femenina y pausada: la abuela)."""
+"""Narra cada escena con Google Cloud TTS (voz de hombre, grave y pausada: el abuelo)."""
 
 import json
 
@@ -8,7 +8,7 @@ from tts_cloud import guardar_wav, sintetizar
 # Voces en orden de preferencia; si la primera no está disponible se usa la siguiente
 VOCES = env(
     "VOCES_TTS",
-    "es-US-Chirp3-HD-Kore,es-US-Chirp3-HD-Aoede,es-US-Neural2-A,es-US-Chirp3-HD-Charon",
+    "es-US-Chirp3-HD-Charon,es-US-Chirp3-HD-Orus,es-US-Chirp3-HD-Fenrir,es-US-Neural2-B",
 ).split(",")
 VELOCIDAD = float(env("VELOCIDAD_TTS", "0.92"))
 

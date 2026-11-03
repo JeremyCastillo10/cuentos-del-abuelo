@@ -17,7 +17,7 @@ export type Escena = {
 
 export type Episodio = {
   fecha: string;
-  tipo: "ficcion" | "leyenda" | "misterio";
+  tipo: "ficcion" | "leyenda" | "misterio" | "crimen";
   titulo: string;
   escenas: Escena[];
   caption: string;
@@ -29,8 +29,8 @@ export type HistoriaProps = {
   duraciones: number[];
 };
 
-export const NOMBRE = "CUENTOS DE LA ABUELA";
-export const CUENTA = "@cuentosdelaabuela";
+export const NOMBRE = "CUENTOS DEL ABUELO";
+export const CUENTA = "@cuentosdelabuelo";
 export const FPS = 30;
 export const INTRO = 60; // tarjeta de título
 export const OUTRO = 75; // "Síguenos"
