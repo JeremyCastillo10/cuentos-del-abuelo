@@ -30,7 +30,7 @@ export type HistoriaProps = {
 };
 
 export const NOMBRE = "CUENTOS DEL ABUELO";
-export const CUENTA = "@cuentosdelabuelo";
+export const CUENTA = "@cuentosdelabuelo_";
 export const FPS = 30;
 export const INTRO = 60; // tarjeta de título
 export const OUTRO = 75; // "Síguenos"
