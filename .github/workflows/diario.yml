@@ -1,0 +1,94 @@
+name: Historia diaria
+
+on:
+  schedule:
+    # Cada hora de 7:00 p. m. a 11:00 p. m. (hora de República Dominicana): las historias
+    # de miedo rinden más de noche. Solo genera si hoy aún no se publicó.
+    - cron: "0 23 * * *"
+    - cron: "0 0-3 * * *"
+  workflow_dispatch:
+    inputs:
+      publicar:
+        description: "¿Publicar en Instagram y Facebook?"
+        type: boolean
+        default: true
+      forzar:
+        description: "Generar aunque hoy ya se haya publicado"
+        type: boolean
+        default: false
+
+# Una ejecución a la vez
+concurrency:
+  group: historia-diaria
+  cancel-in-progress: false
+
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    outputs:
+      falta: ${{ steps.revisar.outputs.falta }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: revisar
+        run: |
+          HOY=$(TZ=America/Santo_Domingo date +%F)
+          PUBLICADO=$(python3 -c "import json; print(json.load(open('data/episodio_publicado.json')).get('fecha', ''))" 2>/dev/null || true)
+          echo "Hoy $HOY, último publicado: $PUBLICADO"
+          if [ "$PUBLICADO" = "$HOY" ]; then echo "falta=no" >> "$GITHUB_OUTPUT"; else echo "falta=si" >> "$GITHUB_OUTPUT"; fi
+
+  historia:
+    needs: revisar
+    if: (github.event_name == 'workflow_dispatch' && inputs.forzar) || needs.revisar.outputs.falta == 'si'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GOOGLE_TTS_KEY: ${{ secrets.GOOGLE_TTS_KEY }}
+      IG_USER_ID: ${{ secrets.IG_USER_ID }}
+      IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+      FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+      FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci
+      - name: Dependencias de Chrome para Remotion
+        run: npx remotion browser ensure
+      - name: Historia
+        run: python scripts/historia.py
+      - name: Voces
+        run: python scripts/voces.py
+      - name: Render
+        run: npx remotion render Historia out/episodio.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: historia
+          path: |
+            out/episodio.mp4
+            public/episodio.json
+          retention-days: 14
+      - id: ig
+        name: Publicar en Instagram
+        if: github.event_name == 'schedule' || inputs.publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/publicar.py
+      - name: Publicar en Facebook
+        if: (github.event_name == 'schedule' || inputs.publicar) && env.FB_PAGE_TOKEN != ''
+        run: python scripts/facebook.py reel
+      # Con la API de GitHub, no con git: public/episodio.json ya está modificado
+      - name: Guardar fecha y título publicados
+        if: steps.ig.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/registrar.py

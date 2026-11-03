@@ -1,0 +1,24 @@
+{
+  "name": "relatos-de-medianoche",
+  "version": "1.0.0",
+  "description": "Historias narradas diarias (terror, leyendas y misterios) en video vertical",
+  "scripts": {
+    "studio": "remotion studio",
+    "historia": "python scripts/historia.py",
+    "voces": "python scripts/voces.py",
+    "render": "remotion render Historia out/episodio.mp4"
+  },
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "^4.0.539",
+    "@remotion/google-fonts": "^4.0.539",
+    "@remotion/media-utils": "^4.0.539",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.539"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}

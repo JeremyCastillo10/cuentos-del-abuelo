@@ -1,0 +1,17 @@
+{
+  "fecha": "2026-11-03",
+  "tipo": "leyenda",
+  "titulo": "La mujer del río",
+  "escenas": [
+    {"texto": "Mi abuela nunca dejaba que nadie se bañara en el río después de las seis.", "ambiente": "pueblo"},
+    {"texto": "Decía que a esa hora el agua dejaba de ser agua.", "ambiente": "pueblo"},
+    {"texto": "Una tarde, mi primo Julián se rió de ella y bajó por el camino del bosque.", "ambiente": "bosque"},
+    {"texto": "Cuenta la leyenda que allí aparece una mujer con los pies al revés.", "ambiente": "bosque"},
+    {"texto": "Las huellas parecen ir hacia el río, pero en realidad se alejan de él.", "ambiente": "bosque"},
+    {"texto": "Julián volvió de noche, empapado, sin decir una sola palabra.", "ambiente": "casa"},
+    {"texto": "Esa madrugada, alguien tocó tres veces la ventana de su cuarto.", "ambiente": "habitacion"},
+    {"texto": "Y por la mañana, frente a la casa, había huellas mojadas en la tierra.", "ambiente": "casa"},
+    {"texto": "Todas apuntaban hacia la puerta. Ninguna se alejaba.", "ambiente": "casa"}
+  ],
+  "caption": "Las huellas apuntaban hacia la puerta. Ninguna se alejaba.\n🌙 Leyenda popular: cuenta lo que dice la tradición, no un hecho comprobado.\n¿Tu abuela también te contaba leyendas así?\n\n#leyendas #terror #historiasdeterror #misterio #RelatosDeMedianoche"
+}
