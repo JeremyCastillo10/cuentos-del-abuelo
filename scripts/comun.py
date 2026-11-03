@@ -11,7 +11,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 PUBLIC = RAIZ / "public"
 EPISODIO = PUBLIC / "episodio.json"
 
-MARCA = "#RelatosDeMedianoche"
+MARCA = "#CuentosDeLaAbuela"
 MAX_HASHTAGS = 5  # Instagram recomienda pocos hashtags y relevantes
 
 
@@ -54,7 +54,7 @@ def env(nombre: str, defecto: str | None = None) -> str:
 
 def http(url: str, datos: dict | bytes | None = None, headers: dict | None = None, metodo: str | None = None) -> dict:
     cuerpo = json.dumps(datos).encode() if isinstance(datos, dict) else datos
-    h = {"Content-Type": "application/json", "User-Agent": "relatos-de-medianoche"} | (headers or {})
+    h = {"Content-Type": "application/json", "User-Agent": "cuentos-de-la-abuela"} | (headers or {})
     req = urllib.request.Request(url, data=cuerpo, headers=h, method=metodo)
     with urllib.request.urlopen(req, timeout=120) as r:
         return json.loads(r.read().decode())

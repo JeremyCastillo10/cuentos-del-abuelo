@@ -42,7 +42,7 @@ def main() -> None:
         raise SystemExit("No se encontró ninguna página: revisa que el token tenga pages_show_list y que elegiste la página")
     for i, p in enumerate(paginas):
         print(f"{i}: {p['name']} ({p['id']})")
-    buscar = env("FB_PAGE_NOMBRE", "relatos").lower()
+    buscar = env("FB_PAGE_NOMBRE", "abuela").lower()
     elegida = next((p for p in paginas if buscar in p["name"].lower()), paginas[0])
 
     guardar_en_env({"FB_PAGE_ID": elegida["id"], "FB_PAGE_TOKEN": elegida["access_token"], "FB_USER_TOKEN": ""})

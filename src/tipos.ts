@@ -29,8 +29,8 @@ export type HistoriaProps = {
   duraciones: number[];
 };
 
-export const NOMBRE = "RELATOS DE MEDIANOCHE";
-export const CUENTA = "@relatosdemedianoche";
+export const NOMBRE = "CUENTOS DE LA ABUELA";
+export const CUENTA = "@cuentosdelaabuela";
 export const FPS = 30;
 export const INTRO = 60; // tarjeta de título
 export const OUTRO = 75; // "Síguenos"
