@@ -60,9 +60,24 @@ def buscar(consulta: str, usadas: set[str]) -> dict | None:
 
 
 def descargar(url: str, ruta) -> None:
+    """Descarga la foto, la recorta a vertical 1080x1920 y la oscurece para el ambiente de misterio."""
+    import io
+
+    from PIL import Image, ImageEnhance
+
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=60) as r:
-        ruta.write_bytes(r.read())
+        foto = Image.open(io.BytesIO(r.read())).convert("RGB")
+    # Recorte centrado a 9:16 un poco más grande que el video (deja margen al acercamiento lento)
+    ancho, alto = 1188, 2112
+    escala = max(ancho / foto.width, alto / foto.height)
+    foto = foto.resize((round(foto.width * escala), round(foto.height * escala)), Image.LANCZOS)
+    x, y = (foto.width - ancho) // 2, (foto.height - alto) // 2
+    foto = foto.crop((x, y, x + ancho, y + alto))
+    foto = ImageEnhance.Color(foto).enhance(0.7)
+    foto = ImageEnhance.Contrast(foto).enhance(1.12)
+    foto = ImageEnhance.Brightness(foto).enhance(0.62)
+    foto.save(ruta, "JPEG", quality=88)
 
 
 def main() -> None:

@@ -78,7 +78,8 @@ const Foto: React.FC<{ archivo: string }> = ({ archivo }) => (
   <AbsoluteFill>
     <Img
       src={staticFile(archivo)}
-      style={{ width: "100%", height: "100%", objectFit: "cover", filter: "brightness(0.62) contrast(1.12) saturate(0.7)" }}
+      // El oscurecido ya viene hecho de scripts/imagenes.py (más rápido que un filtro CSS por fotograma)
+      style={{ width: "100%", height: "100%", objectFit: "cover" }}
     />
     {/* Tinte frío y oscuro arriba y abajo para que el texto se lea */}
     <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(5,8,20,.55) 0%, rgba(5,8,20,.15) 35%, rgba(5,8,20,.2) 60%, rgba(0,0,0,.75) 100%)" }} />
@@ -128,6 +129,11 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
   // Subtítulos: las palabras se van iluminando al ritmo de la narración
   const palabras = escena.texto.split(" ");
   const visibles = Math.ceil(interpolate(t, [0, dur * 0.9], [0, palabras.length], { extrapolateRight: "clamp" }));
+  // Subtítulo por tramos de 8 palabras: solo se ve la frase que se está diciendo
+  const TRAMO = 8;
+  const tramo = Math.min(Math.floor(Math.max(0, visibles - 1) / TRAMO), Math.floor((palabras.length - 1) / TRAMO));
+  const desde = tramo * TRAMO;
+  const enPantalla = palabras.slice(desde, desde + TRAMO);
 
   const entraTitulo = spring({ frame, fps, config: { damping: 9 } });
   const temblor = enIntro ? Math.sin(frame * 2.1) * 3 : 0;
@@ -141,7 +147,8 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
   return (
     <AbsoluteFill style={{ backgroundColor: "#000", fontFamily: fuenteTexto, overflow: "hidden" }}>
       <AbsoluteFill style={{ transform: `scale(${zoom})` }}>
-        <Fondo escena={previa} frame={frame} luz={luz} />
+        {/* La foto anterior solo se dibuja mientras dura el fundido */}
+        {mezcla < 1 && <Fondo escena={previa} frame={frame} luz={luz} />}
         <AbsoluteFill style={{ opacity: mezcla }}>
           <Fondo escena={escena} frame={frame} luz={luz} />
         </AbsoluteFill>
@@ -189,13 +196,16 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
 
       {/* Subtítulos */}
       {!enIntro && !enOutro && (
-        <div style={{ position: "absolute", left: 70, right: 70, top: 680, textAlign: "center" }}>
+        <div style={{ position: "absolute", left: 70, right: 70, top: 1180, textAlign: "center" }}>
           <div style={{ color: "#fff", fontWeight: 900, fontSize: 74, lineHeight: 1.2, textShadow: sombra }}>
-            {palabras.map((p, k) => (
-              <span key={k} style={{ opacity: k < visibles ? 1 : 0.22, color: k === visibles - 1 ? "#ffd6d6" : "#fff" }}>
-                {p}{" "}
-              </span>
-            ))}
+            {enPantalla.map((p, j) => {
+              const k = desde + j;
+              return (
+                <span key={k} style={{ opacity: k < visibles ? 1 : 0.3, color: k === visibles - 1 ? "#ffd6d6" : "#fff" }}>
+                  {p}{" "}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}

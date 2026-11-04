@@ -36,10 +36,10 @@ export type HistoriaProps = {
 
 export const NOMBRE = "CUENTOS DEL ABUELO";
 export const CUENTA = "@cuentos_delabuelo";
-export const FPS = 30;
-export const INTRO = 60; // tarjeta de título
-export const OUTRO = 75; // "Síguenos"
-export const PAUSA = 8; // respiro entre frases
+export const FPS = 24; // suficiente para movimientos lentos y 20 % más rápido de renderizar
+export const INTRO = 48; // tarjeta de título (2 s)
+export const OUTRO = 72; // "Síguenos" (3 s)
+export const PAUSA = 6; // respiro entre frases
 
 // Color de cada lugar: cielo arriba, cielo abajo y tono de la niebla
 export const PALETA: Record<Ambiente, { arriba: string; abajo: string; niebla: string }> = {
