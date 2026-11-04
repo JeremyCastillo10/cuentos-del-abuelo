@@ -4,3 +4,4 @@ out/
 public/audio/
 public/fotos/
 public/imagenes/
+__pycache__/
