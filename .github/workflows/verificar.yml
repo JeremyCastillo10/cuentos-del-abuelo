@@ -17,6 +17,9 @@ jobs:
       - name: Facebook
         run: |
           curl -s "https://graph.facebook.com/v21.0/$FB_PAGE_ID?fields=name&access_token=$FB_PAGE_TOKEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Facebook:', d.get('name') or d)"
+          # A qué página pertenece el token guardado (debe ser la misma que FB_PAGE_ID)
+          curl -s "https://graph.facebook.com/v21.0/me?fields=id,name&access_token=$FB_PAGE_TOKEN" | python3 -c "import json,sys,os; d=json.load(sys.stdin); print('Token de:', d.get('name'), '| coincide con FB_PAGE_ID:', d.get('id') == os.environ['FB_PAGE_ID'], '' if d.get('id') else d)"
+          curl -s "https://graph.facebook.com/v21.0/me/permissions?access_token=$FB_PAGE_TOKEN" | head -c 600; echo
       - name: Instagram
         run: |
           curl -s "https://graph.facebook.com/v21.0/$IG_USER_ID?fields=username&access_token=$IG_ACCESS_TOKEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Instagram (graph.facebook):', d.get('username') or d)"
