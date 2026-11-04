@@ -30,6 +30,12 @@ BUSQUEDAS = {
         "avión desaparecido misterio búsqueda",
         "muerte misteriosa caso sin resolver",
     ],
+    "paranormal": [
+        "poltergeist caso famoso investigación",
+        "casa encantada historia fantasmas testigos",
+        "aparición fantasma caso famoso",
+        "fenómeno paranormal caso investigado",
+    ],
     "leyenda": [
         "leyenda dominicana",
         "leyenda urbana latinoamericana",
@@ -62,6 +68,12 @@ SEMILLAS = {
         "Desaparición del faro de las islas Flannan", "Perro de Bodmin", "Mapa de Piri Reis",
         "Kaspar Hauser", "Hombre de la máscara de hierro", "Niños verdes de Woolpit", "Muerte de Edgar Allan Poe",
         "Caso Elisa Lam", "Pirámides de Güímar", "Tunguska",
+    ],
+    "paranormal": [
+        "Poltergeist de Enfield", "Casa Winchester", "Caras de Bélmez", "Dama Marrón de Raynham Hall",
+        "Bruja de Bell", "Annabelle (muñeca)", "Robert (muñeco)", "Isla de las Muñecas", "Palacio de Linares",
+        "Caso Amityville", "Hotel Cecil", "Castillo de Chillingham", "Torre de Londres", "Hospital Waverly Hills",
+        "Casa de los Espíritus", "Castillo de Edimburgo", "Mansión Myrtles", "Penitenciaría Estatal del Este",
     ],
     "leyenda": [
         "Ciguapa", "Bacá", "Galipote", "La Llorona", "El Silbón", "La Sayona", "Chupacabras",

@@ -100,7 +100,7 @@ def main() -> None:
         elif motor == "gemini":
             pcm = voz_gemini(escena["texto"], modelos)
         else:
-            pcm = tts_edge.sintetizar(escena["texto"], VOZ_EDGE)
+            pcm = tts_edge.sintetizar(escena["texto"], VOZ_EDGE, velocidad=env("VELOCIDAD_EDGE", "+5%"), tono=env("TONO_EDGE", "-2Hz"))
         guardar_wav(pcm, archivo)
         escena["audio"] = f"audio/{archivo.name}"
         print(f"{archivo.name}: {escena['texto'][:70]}")

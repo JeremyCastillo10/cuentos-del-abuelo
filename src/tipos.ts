@@ -21,7 +21,7 @@ export type Escena = {
 
 export type Episodio = {
   fecha: string;
-  tipo: "leyenda" | "misterio" | "crimen";
+  tipo: "leyenda" | "misterio" | "crimen" | "paranormal";
   fuente?: { titulo: string; url: string };
   titulo: string;
   escenas: Escena[];

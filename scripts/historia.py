@@ -17,22 +17,32 @@ AMBIENTES = ["bosque", "casa", "carretera", "mar", "pueblo", "cementerio", "habi
 # Se rota por día para que la página tenga variedad. Todas son historias REALES sacadas de Wikipedia.
 TIPOS = [
     (
-        "crimen",
-        "Es un caso criminal REAL. Cuenta cómo pasó, cómo se investigó y cómo se descubrió la verdad. "
-        "Sin detalles gráficos de la violencia y con respeto hacia las víctimas; no nombres a familiares "
-        "ni a menores de edad.",
+        "misterio",
+        "Es un misterio o caso REAL SIN RESOLVER. Cuenta lo que se sabe, las pistas y las teorías que "
+        "recoge el texto, dejando claro qué está comprobado y qué no. Termina con la pregunta que nadie ha respondido.",
     ),
     (
-        "misterio",
-        "Es un misterio o suceso REAL sin explicación clara. Cuenta lo que se sabe y las teorías que "
-        "recoge el texto, dejando claro qué está comprobado y qué no.",
+        "crimen",
+        "Es un caso criminal REAL (asesinato o crimen famoso, resuelto o sin resolver). Cuenta cómo pasó, cómo se "
+        "investigó y qué se descubrió. Sin detalles gráficos de la violencia y con respeto hacia las víctimas; "
+        "no nombres a familiares ni a menores de edad.",
     ),
+    (
+        "paranormal",
+        "Es un caso REAL de apariciones o fenómenos paranormales que la gente reportó (casa embrujada, "
+        "poltergeist, fantasma famoso). Cuenta lo que dijeron los testigos y lo que se investigó, dejando claro "
+        "que no está comprobado y qué explicaciones se han dado.",
+    ),
+]
+# Orden de la semana: más casos sin resolver, asesinatos y apariciones; una leyenda de vez en cuando
+ROTACION = ["misterio", "crimen", "paranormal", "misterio", "crimen", "paranormal", "leyenda"]
+TIPOS.append(
     (
         "leyenda",
         "Es una leyenda tradicional REAL (existe y la gente la cuenta). Cuéntala como lo recoge el texto "
         "y deja claro que es una leyenda popular, no un hecho comprobado.",
-    ),
-]
+    )
+)
 
 INSTRUCCIONES = """Eres el narrador de "Cuentos del Abuelo", una página de historias REALES narradas en video vertical
 (Instagram y Facebook) para público latino. Narras como un locutor profesional de historias de misterio:
@@ -54,8 +64,10 @@ Reglas:
    personas implicadas, pistas, giros y desenlace.
 5. Divide el texto en ENTRE 35 Y 50 ESCENAS. Cada escena es una o dos frases de 18 a 28 palabras, fáciles
    de narrar. Menos de 35 escenas es demasiado corto: sigue contando con más hechos del artículo.
-6. La PRIMERA escena es el gancho: un hecho real que obligue a seguir viendo (nada de saludos ni
-   "hoy les traigo").
+6. La PRIMERA escena es el gancho: el hecho más impactante o inquietante del caso, contado en una frase
+   que obligue a seguir viendo (nada de saludos, presentaciones ni "hoy les traigo").
+   RITMO DE HISTORIA QUE ATRAPA: frases cortas y directas; cada 4 o 5 escenas un giro, un dato sorprendente
+   o una pregunta que deje intriga ("Pero eso no fue lo más extraño..."); nada de párrafos de relleno.
 7. Nada de violencia gráfica, gore ni contenido sexual. Apto para mayores de 13 años.
 8. Cada escena lleva "ambiente": uno de {ambientes} (el lugar donde ocurre esa parte).
    Y lleva "imagen": búsqueda EN INGLÉS de 3 a 6 palabras para encontrar una FOTO REAL de banco de imágenes
@@ -69,7 +81,7 @@ Reglas:
    - Segunda línea: "{etiqueta}".
    - Tercera línea: una pregunta para que la gente comente.
    - Al final 4 hashtags en español, sin tildes, según el tipo (ej. #casosreales #truecrime #misterio
-     #leyendas #historiasreales).
+     #paranormal #historiasreales).
 
 Responde SOLO con JSON:
 {{"apto": true, "titulo": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "..."}}, ... (35 a 50 escenas)], "caption": "..."}}"""
@@ -78,6 +90,7 @@ ETIQUETAS = {
     "leyenda": "🌙 Leyenda popular real: cuenta lo que dice la tradición, no un hecho comprobado.",
     "misterio": "🔎 Caso real sin resolver, contado con lo que se sabe.",
     "crimen": "⚖️ Caso real, contado con información pública.",
+    "paranormal": "👻 Caso paranormal reportado: cuenta lo que dijeron los testigos, no está comprobado.",
 }
 
 
@@ -163,7 +176,8 @@ def validar(historia: dict) -> dict:
 def main() -> None:
     cargar_env()
     hoy = date.today()
-    clave, descripcion = TIPOS[hoy.toordinal() % len(TIPOS)]
+    clave = ROTACION[hoy.toordinal() % len(ROTACION)]
+    descripcion = dict(TIPOS)[clave]
     publicadas = cargar_publicadas()
     sistema = INSTRUCCIONES.format(
         tipo=descripcion,
