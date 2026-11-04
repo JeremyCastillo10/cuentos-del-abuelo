@@ -62,10 +62,9 @@ const Niebla: React.FC<{ color: string; frame: number }> = ({ color, frame }) =>
             top: 1150 + i * 150,
             width: 1100,
             height: 260,
-            borderRadius: "50%",
-            background: color,
-            opacity: 0.1 + (i % 2) * 0.05,
-            filter: "blur(60px)",
+            // Degradado radial en vez de blur: se ve parecido y es mucho más rápido de renderizar
+            background: `radial-gradient(ellipse at center, ${color} 0%, transparent 70%)`,
+            opacity: 0.16 + (i % 2) * 0.06,
           }}
         />
       );

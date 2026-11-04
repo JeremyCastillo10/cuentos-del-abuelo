@@ -96,9 +96,39 @@ def publicar_reel(ruta_mp4, descripcion: str) -> str:
     return video_id
 
 
+def publicar_video(ruta_mp4, titulo: str, descripcion: str) -> str:
+    """Video normal en la página (los Reels de Facebook duran como máximo 90 segundos)."""
+    pagina, token = env("FB_PAGE_ID"), env("FB_PAGE_TOKEN")
+    cuerpo, tipo = _multipart(
+        {"title": titulo, "description": descripcion, "published": "true", "access_token": token},
+        ("historia.mp4", ruta_mp4.read_bytes(), "video/mp4"),
+    )
+    req = urllib.request.Request(
+        f"https://graph-video.facebook.com/v21.0/{pagina}/videos", data=cuerpo, headers={"Content-Type": tipo}
+    )
+    with urllib.request.urlopen(req, timeout=900) as r:
+        resultado = json.loads(r.read())
+    print("Video publicado en Facebook:", resultado.get("id"))
+    return resultado["id"]
+
+
+def duracion(ruta_mp4) -> float:
+    import subprocess
+
+    salida = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(ruta_mp4)],
+        check=True, capture_output=True, text=True,
+    ).stdout
+    return float(salida.strip())
+
+
 if __name__ == "__main__":
-    # Uso: python scripts/facebook.py reel  -> sube out/episodio.mp4 con el caption del episodio
+    # Uso: python scripts/facebook.py reel -> sube out/episodio.mp4 como Reel (<= 90 s) o como video
     cargar_env()
     if sys.argv[1:] == ["reel"]:
-        caption = json.loads(EPISODIO.read_text(encoding="utf-8")).get("caption", "")
-        publicar_reel(RAIZ / "out" / "episodio.mp4", caption)
+        episodio = json.loads(EPISODIO.read_text(encoding="utf-8"))
+        ruta = RAIZ / "out" / "episodio.mp4"
+        if duracion(ruta) <= 89:
+            publicar_reel(ruta, episodio.get("caption", ""))
+        else:
+            publicar_video(ruta, episodio.get("titulo", ""), episodio.get("caption", ""))

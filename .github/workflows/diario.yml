@@ -40,7 +40,7 @@ jobs:
     needs: revisar
     if: (github.event_name == 'workflow_dispatch' && inputs.forzar) || needs.revisar.outputs.falta == 'si'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 120
     permissions:
       contents: write
     env:
@@ -62,6 +62,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: npm ci
+      - name: Voz (edge-tts)
+        run: pip install edge-tts
       - name: Dependencias de Chrome para Remotion
         run: npx remotion browser ensure
       - name: Historia
@@ -69,7 +71,7 @@ jobs:
       - name: Voces
         run: python scripts/voces.py
       - name: Render
-        run: npx remotion render Historia out/episodio.mp4
+        run: npx remotion render Historia out/episodio.mp4 --concurrency=100% --crf=26
       - uses: actions/upload-artifact@v4
         with:
           name: historia
