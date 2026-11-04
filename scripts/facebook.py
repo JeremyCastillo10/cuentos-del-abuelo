@@ -3,6 +3,7 @@
 import json
 import sys
 import time
+import urllib.error
 import urllib.request
 import uuid
 
@@ -103,13 +104,21 @@ def publicar_video(ruta_mp4, titulo: str, descripcion: str) -> str:
         {"title": titulo, "description": descripcion, "published": "true", "access_token": token},
         ("historia.mp4", ruta_mp4.read_bytes(), "video/mp4"),
     )
-    req = urllib.request.Request(
-        f"https://graph-video.facebook.com/v21.0/{pagina}/videos", data=cuerpo, headers={"Content-Type": tipo}
-    )
-    with urllib.request.urlopen(req, timeout=900) as r:
-        resultado = json.loads(r.read())
-    print("Video publicado en Facebook:", resultado.get("id"))
-    return resultado["id"]
+    for intento in range(1, 4):
+        req = urllib.request.Request(
+            f"https://graph-video.facebook.com/v21.0/{pagina}/videos", data=cuerpo, headers={"Content-Type": tipo}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=900) as r:
+                resultado = json.loads(r.read())
+            print("Video publicado en Facebook:", resultado.get("id"))
+            return resultado["id"]
+        except urllib.error.HTTPError as e:
+            detalle = e.read().decode(errors="ignore")[:600]
+            print(f"Facebook respondió {e.code} (intento {intento}): {detalle}")
+            if intento == 3 or e.code not in (400, 500, 502, 503):
+                raise SystemExit(f"Facebook no aceptó el video: {detalle}")
+            time.sleep(60 * intento)
 
 
 def duracion(ruta_mp4) -> float:

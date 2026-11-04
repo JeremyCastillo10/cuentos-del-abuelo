@@ -38,7 +38,12 @@ jobs:
           HOY=$(TZ=America/Santo_Domingo date +%F)
           PUBLICADO=$(python3 -c "import json; print(json.load(open('data/episodio_publicado.json')).get('fecha', ''))" 2>/dev/null || true)
           echo "Hoy $HOY, último publicado: $PUBLICADO"
-          if [ "$PUBLICADO" = "$HOY" ]; then echo "falta=no" >> "$GITHUB_OUTPUT"; else echo "falta=si" >> "$GITHUB_OUTPUT"; fi
+          HORA=$(TZ=America/Santo_Domingo date +%-H)
+          if [ "$PUBLICADO" = "$HOY" ]; then echo "falta=no" >> "$GITHUB_OUTPUT"
+          # GitHub a veces retrasa los horarios: uno de las 11 p. m. que arranca después de medianoche
+          # ya es "otro día" y publicaría de madrugada. Los programados solo cuentan de 6 p. m. a 11:59 p. m.
+          elif [ "${{ github.event_name }}" = "schedule" ] && [ "$HORA" -lt 18 ]; then echo "Fuera de horario ($HORA h)"; echo "falta=no" >> "$GITHUB_OUTPUT"
+          else echo "falta=si" >> "$GITHUB_OUTPUT"; fi
 
   historia:
     needs: revisar
@@ -104,7 +109,8 @@ jobs:
         run: python scripts/facebook.py reel
       # Con la API de GitHub, no con git: public/episodio.json ya está modificado
       - name: Guardar fecha y título publicados
-        if: steps.ig.outcome == 'success'
+        # Aunque falle Facebook: si Instagram publicó, hoy ya cuenta como publicado
+        if: always() && steps.ig.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python scripts/registrar.py
