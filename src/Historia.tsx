@@ -3,6 +3,7 @@ import {
   AbsoluteFill,
   Easing,
   Html5Audio,
+  Img,
   Sequence,
   interpolate,
   spring,
@@ -13,7 +14,7 @@ import {
 import { loadFont as cargarTitulo } from "@remotion/google-fonts/Creepster";
 import { loadFont as cargarTexto } from "@remotion/google-fonts/Montserrat";
 import { Siluetas } from "./Siluetas";
-import { CUENTA, INTRO, NOMBRE, PALETA, type Ambiente, type HistoriaProps } from "./tipos";
+import { CUENTA, INTRO, NOMBRE, PALETA, type Ambiente, type Escena, type HistoriaProps } from "./tipos";
 
 const { fontFamily: fuenteTitulo } = cargarTitulo("normal", { weights: ["400"], subsets: ["latin"] });
 const { fontFamily: fuenteTexto } = cargarTexto("normal", { weights: ["800", "900"], subsets: ["latin"] });
@@ -72,6 +73,22 @@ const Niebla: React.FC<{ color: string; frame: number }> = ({ color, frame }) =>
   </AbsoluteFill>
 );
 
+// Foto real a pantalla completa, oscurecida para dar ambiente de misterio
+const Foto: React.FC<{ archivo: string }> = ({ archivo }) => (
+  <AbsoluteFill>
+    <Img
+      src={staticFile(archivo)}
+      style={{ width: "100%", height: "100%", objectFit: "cover", filter: "brightness(0.62) contrast(1.12) saturate(0.7)" }}
+    />
+    {/* Tinte frío y oscuro arriba y abajo para que el texto se lea */}
+    <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(5,8,20,.55) 0%, rgba(5,8,20,.15) 35%, rgba(5,8,20,.2) 60%, rgba(0,0,0,.75) 100%)" }} />
+  </AbsoluteFill>
+);
+
+// Fondo de una escena: su foto si la hay; si no, el escenario dibujado
+const Fondo: React.FC<{ escena: Escena; frame: number; luz: number }> = ({ escena, frame, luz }) =>
+  escena.foto ? <Foto archivo={escena.foto.archivo} /> : <Cielo ambiente={escena.ambiente} frame={frame} t={frame} luz={luz} />;
+
 export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -93,12 +110,15 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
   const dur = duraciones[i] ?? 1;
 
   // Fundido entre lugares cuando cambia el ambiente
-  const anterior = i > 0 ? escenas[i - 1].ambiente : escena.ambiente;
-  const cambio = !enIntro && anterior !== escena.ambiente;
-  const mezcla = cambio ? interpolate(t, [0, 18], [0, 1], { extrapolateRight: "clamp" }) : 1;
+  const previa = i > 0 ? escenas[i - 1] : escena;
+  const claveFondo = (e: Escena) => e.foto?.archivo ?? e.ambiente;
+  const cambio = !enIntro && claveFondo(previa) !== claveFondo(escena);
+  const mezcla = cambio ? interpolate(t, [0, 24], [0, 1], { extrapolateRight: "clamp" }) : 1;
 
   // Relámpago breve al entrar en un lugar nuevo
-  const relampago = cambio ? interpolate(t, [0, 2, 5, 7, 12], [0, 0.55, 0.1, 0.35, 0], { extrapolateRight: "clamp" }) : 0;
+  // Solo cuando cambia el lugar (no en cada foto), para no cansar
+  const cambioLugar = !enIntro && previa.ambiente !== escena.ambiente;
+  const relampago = cambioLugar ? interpolate(t, [0, 2, 5, 7, 12], [0, 0.45, 0.08, 0.28, 0], { extrapolateRight: "clamp" }) : 0;
   // Luces de ventanas que parpadean de vez en cuando
   const luz = Math.sin(frame / 3) > 0.92 ? 0.2 : 0.85 + 0.15 * Math.sin(frame / 11);
 
@@ -121,9 +141,9 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
   return (
     <AbsoluteFill style={{ backgroundColor: "#000", fontFamily: fuenteTexto, overflow: "hidden" }}>
       <AbsoluteFill style={{ transform: `scale(${zoom})` }}>
-        <Cielo ambiente={anterior} frame={frame} t={frame} luz={luz} />
+        <Fondo escena={previa} frame={frame} luz={luz} />
         <AbsoluteFill style={{ opacity: mezcla }}>
-          <Cielo ambiente={escena.ambiente} frame={frame} t={frame} luz={luz} />
+          <Fondo escena={escena} frame={frame} luz={luz} />
         </AbsoluteFill>
         <Niebla color={PALETA[escena.ambiente].niebla} frame={frame} />
       </AbsoluteFill>
@@ -131,6 +151,13 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
       {/* Viñeta y relámpago */}
       <AbsoluteFill style={{ background: "radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(0,0,0,.85) 100%)" }} />
       <AbsoluteFill style={{ background: "#dfe8ff", opacity: relampago }} />
+
+      {/* Crédito de la foto (Pexels/Pixabay no lo exigen, pero se agradece) */}
+      {!enIntro && !enOutro && escena.foto && (
+        <div style={{ position: "absolute", bottom: 70, left: 50, color: "rgba(255,255,255,.55)", fontSize: 22, fontWeight: 800 }}>
+          Foto: {escena.foto.autor} · {escena.foto.fuente}
+        </div>
+      )}
 
       {/* Marca arriba */}
       <div style={{ position: "absolute", top: 110, left: 0, right: 0, textAlign: "center" }}>

@@ -48,6 +48,8 @@ jobs:
       GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       GOOGLE_TTS_KEY: ${{ secrets.GOOGLE_TTS_KEY }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
       IG_USER_ID: ${{ secrets.IG_USER_ID }}
       IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
       FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
@@ -68,6 +70,8 @@ jobs:
         run: npx remotion browser ensure
       - name: Historia
         run: python scripts/historia.py
+      - name: Fotos reales
+        run: python scripts/imagenes.py
       - name: Voces
         run: python scripts/voces.py
       - name: Render

@@ -11,6 +11,10 @@ export type Ambiente =
 export type Escena = {
   texto: string;
   ambiente: Ambiente;
+  // Búsqueda en inglés para la foto (la escribe scripts/historia.py)
+  imagen?: string;
+  // Foto real elegida por scripts/imagenes.py (Pexels o Pixabay)
+  foto?: { archivo: string; autor: string; fuente: string };
   // Ruta dentro de public/, la escribe scripts/voces.py
   audio?: string;
 };

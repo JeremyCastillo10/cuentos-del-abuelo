@@ -47,7 +47,7 @@ voz grave, ritmo pausado, frases que crean atmósfera. De vez en cuando puedes a
 
 Reglas:
 1. {tipo}
-2. Dura entre 3 y 8 minutos narrada: entre {min_palabras} y {max_palabras} palabras en total. Usa ese
+2. Dura entre 5 y 8 minutos narrada: entre {min_palabras} y {max_palabras} palabras en total. Usa ese
    espacio para desarrollar bien la historia: contexto, personajes, pistas, tensión que crece y desenlace.
 3. Divide el texto en escenas: cada escena es una o dos frases (máx 30 palabras), fáciles de narrar.
 4. La PRIMERA escena es el gancho: una frase que obligue a seguir viendo (nada de saludos ni
@@ -55,6 +55,11 @@ Reglas:
 5. Construye tensión y termina con un giro o un final abierto que deje pensando.
 6. Nada de violencia gráfica, gore, suicidio ni contenido sexual. Apto para mayores de 13 años.
 7. Cada escena lleva "ambiente": uno de {ambientes} (el lugar donde ocurre esa parte).
+   Y lleva "imagen": búsqueda EN INGLÉS de 3 a 6 palabras para encontrar una FOTO REAL de banco de imágenes
+   que muestre lo que se narra (lugar, objeto, clima, hora), por ejemplo "abandoned wooden house night fog",
+   "old rural road dark trees", "candle on table dark room". Sin nombres propios ni personas reales
+   identificables: en casos reales describe el lugar o un objeto, nunca a la víctima ni al culpable.
+   Escenas seguidas que pasan en el mismo sitio pueden repetir la misma búsqueda.
 8. "titulo": corto y llamativo (máx 40 caracteres), sin comillas.
 9. "caption" para Instagram y Facebook:
    - Primera línea: el gancho resumido (máx 110 caracteres).
@@ -65,7 +70,7 @@ Reglas:
 10. No repitas estas historias ya publicadas: {publicadas}
 
 Responde SOLO con JSON:
-{{"titulo": "...", "escenas": [{{"texto": "...", "ambiente": "..."}}], "caption": "..."}}"""
+{{"titulo": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "..."}}], "caption": "..."}}"""
 
 ETIQUETAS = {
     "ficcion": "📖 Historia de ficción original.",
@@ -109,13 +114,37 @@ def groq_texto(sistema: str, usuario: str) -> str:
     raise RuntimeError("Ningún modelo de Groq respondió: " + " | ".join(errores))
 
 
+def escribir(sistema: str, usuario: str) -> str:
+    """JSON de la historia como texto: Gemini y, si no responde, Groq."""
+    cuerpo = {
+        "systemInstruction": {"parts": [{"text": sistema}]},
+        "contents": [{"parts": [{"text": usuario}]}],
+        "generationConfig": {"responseMimeType": "application/json", "temperature": 1.0, "maxOutputTokens": 16000},
+    }
+    for modelo in env("GEMINI_MODELOS_TEXTO", ",".join(MODELOS_TEXTO)).split(","):
+        try:
+            print("Escribiendo historia con", modelo)
+            r = gemini(modelo, cuerpo, reintentos=2)
+            return r["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            print(f"{modelo} no disponible ({e})")
+    if os.environ.get("GROQ_API_KEY"):
+        print("Gemini no respondió; escribiendo la historia con Groq")
+        return groq_texto(sistema, usuario)
+    raise SystemExit("Ningún modelo de texto respondió (Gemini ni Groq)")
+
+
 def cargar_publicadas() -> list[str]:
     return json.loads(PUBLICADAS.read_text(encoding="utf-8")) if PUBLICADAS.exists() else []
 
 
 def validar(historia: dict) -> dict:
     escenas = [
-        {"texto": e["texto"].strip(), "ambiente": e.get("ambiente") if e.get("ambiente") in AMBIENTES else "casa"}
+        {
+            "texto": e["texto"].strip(),
+            "ambiente": e.get("ambiente") if e.get("ambiente") in AMBIENTES else "casa",
+            "imagen": (e.get("imagen") or "").strip(),
+        }
         for e in historia["escenas"]
         if e.get("texto", "").strip()
     ]
@@ -134,33 +163,30 @@ def main() -> None:
         ambientes=", ".join(AMBIENTES),
         etiqueta=ETIQUETAS[clave],
         publicadas="; ".join(publicadas[-60:]) or "(ninguna)",
-        # Narrando a unas 145 palabras por minuto: 3 min ≈ 450 palabras, 8 min ≈ 1150
-        min_palabras=env("MIN_PALABRAS", "450"),
+        # Narrando a unas 145 palabras por minuto: 5 min ≈ 730 palabras, 8 min ≈ 1150
+        min_palabras=env("MIN_PALABRAS", "730"),
         max_palabras=env("MAX_PALABRAS", "1150"),
     )
     usuario = f"Fecha: {hoy.isoformat()}. Escribe la historia de hoy (tipo: {clave})."
 
-    texto = None
-    cuerpo = {
-        "systemInstruction": {"parts": [{"text": sistema}]},
-        "contents": [{"parts": [{"text": usuario}]}],
-        "generationConfig": {"responseMimeType": "application/json", "temperature": 1.0},
-    }
-    for modelo in env("GEMINI_MODELOS_TEXTO", ",".join(MODELOS_TEXTO)).split(","):
-        try:
-            print("Escribiendo historia con", modelo)
-            r = gemini(modelo, cuerpo, reintentos=2)
-            texto = r["candidates"][0]["content"]["parts"][0]["text"]
+    minimo = int(env("MIN_PALABRAS", "730"))
+    mejor, palabras = None, 0
+    pedido = usuario
+    for intento in range(3):
+        historia = validar(json.loads(escribir(sistema, pedido)))
+        n = sum(len(e["texto"].split()) for e in historia["escenas"])
+        print(f"Intento {intento + 1}: {n} palabras")
+        if n > palabras:
+            mejor, palabras = historia, n
+        if n >= minimo * 0.92:
             break
-        except Exception as e:
-            print(f"{modelo} no disponible ({e})")
-    if texto is None and os.environ.get("GROQ_API_KEY"):
-        print("Gemini no respondió; escribiendo la historia con Groq")
-        texto = groq_texto(sistema, usuario)
-    if texto is None:
-        raise SystemExit("Ningún modelo de texto respondió (Gemini ni Groq)")
-
-    historia = validar(json.loads(texto))
+        # Se quedó corta: se pide de nuevo, más larga y desarrollada
+        pedido = (
+            f"{usuario}\nLa versión anterior tenía solo {n} palabras y debe tener al menos {minimo}. "
+            "Escríbela completa otra vez, más desarrollada: más contexto, más detalles del lugar y de los "
+            "personajes, más momentos de tensión antes del desenlace."
+        )
+    historia = mejor
     episodio = {
         "fecha": hoy.isoformat(),
         "tipo": clave,
