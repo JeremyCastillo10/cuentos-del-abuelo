@@ -15,8 +15,11 @@ export type Escena = {
   imagen?: string;
   // Foto real elegida por scripts/imagenes.py (Pexels o Pixabay)
   foto?: { archivo: string; autor: string; fuente: string };
-  // Ruta dentro de public/, la escribe scripts/voces.py
+  // Ruta dentro de public/, la escribe scripts/voces.py. Con Gemini, un audio cubre un trozo
+  // de varias escenas: solo la primera del trozo lleva "audio", y todas llevan "grupo" y "palabras".
   audio?: string;
+  grupo?: number;
+  palabras?: number;
 };
 
 export type Episodio = {

@@ -226,21 +226,27 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
       )}
 
       <Html5Audio src={staticFile("musica.wav")} loop volume={musica} />
-      {escenas.map((e, k) =>
-        e.audio ? (
-          <Sequence key={k} from={inicios[k]} durationInFrames={duraciones[k]}>
+      {escenas.map((e, k) => {
+        if (!e.audio) return null;
+        // Con Gemini un audio cubre todo su grupo de escenas
+        const largo =
+          e.grupo === undefined
+            ? duraciones[k]
+            : escenas.reduce((a, x, j) => (x.grupo === e.grupo ? a + duraciones[j] : a), 0);
+        return (
+          <Sequence key={k} from={inicios[k]} durationInFrames={largo}>
             <Html5Audio
               src={staticFile(e.audio)}
               volume={(f) =>
-                interpolate(f, [0, 3, duraciones[k] - 3, duraciones[k]], [0, 1, 1, 0], {
+                interpolate(f, [0, 3, largo - 3, largo], [0, 1, 1, 0], {
                   extrapolateLeft: "clamp",
                   extrapolateRight: "clamp",
                 })
               }
             />
           </Sequence>
-        ) : null,
-      )}
+        );
+      })}
     </AbsoluteFill>
   );
 };
