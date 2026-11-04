@@ -64,16 +64,18 @@ jobs:
         with:
           python-version: "3.12"
       - run: npm ci
-      - name: Voz (edge-tts)
-        run: pip install edge-tts
+      - name: Voz (edge-tts) y ffmpeg
+        run: |
+          pip install edge-tts
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: Dependencias de Chrome para Remotion
         run: npx remotion browser ensure
       - name: Historia
         run: python scripts/historia.py
-      - name: Fotos reales
-        run: python scripts/imagenes.py
       - name: Voces
         run: python scripts/voces.py
+      - name: Fotos reales
+        run: python scripts/imagenes.py
       - name: Render
         run: npx remotion render Historia out/episodio.mp4 --concurrency=100% --crf=26
       - uses: actions/upload-artifact@v4
