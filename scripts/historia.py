@@ -70,12 +70,14 @@ Reglas:
    o una pregunta que deje intriga ("Pero eso no fue lo más extraño..."); nada de párrafos de relleno.
 7. Nada de violencia gráfica, gore ni contenido sexual. Apto para mayores de 13 años.
 8. Cada escena lleva "ambiente": uno de {ambientes} (el lugar donde ocurre esa parte).
-   Y lleva "imagen": búsqueda EN INGLÉS de 3 a 6 palabras para encontrar una FOTO REAL de banco de imágenes
-   que muestre lo que se narra (lugar, objeto, clima, hora), por ejemplo "abandoned wooden house night fog",
-   "old police car night street", "courtroom wooden benches". Sin nombres propios ni personas reales
-   identificables: nunca la víctima ni el culpable; describe el lugar o un objeto.
-   Escenas seguidas que pasan en el mismo sitio pueden repetir la misma búsqueda.
+   Y lleva "imagen": búsqueda EN INGLÉS de 2 a 4 palabras CONCRETAS de lo que se VE en esa escena:
+   un objeto o lugar físico + (opcional) hora o clima. Ejemplos buenos: "sailing ship storm",
+   "abandoned farmhouse night", "old courthouse", "police car night", "foggy forest", "lighthouse".
+   PROHIBIDO usar palabras abstractas (mystery, fear, disappearance, evidence, crime, death, ghost, history):
+   no sirven para buscar fotos. Sin nombres propios ni personas reales identificables.
+   Escenas seguidas que pasan en el mismo sitio deben repetir la misma búsqueda.
 9. "titulo": corto y llamativo (máx 40 caracteres), sin comillas.
+   "escenario": 2 a 4 palabras en inglés del lugar principal de toda la historia (ej. "old sailing ship ocean").
 10. "caption" para Instagram y Facebook:
    - Primera línea: el gancho resumido (máx 110 caracteres).
    - Segunda línea: "{etiqueta}".
@@ -84,7 +86,7 @@ Reglas:
      #paranormal #historiasreales).
 
 Responde SOLO con JSON:
-{{"apto": true, "titulo": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "..."}}, ... (35 a 50 escenas)], "caption": "..."}}"""
+{{"apto": true, "titulo": "...", "escenario": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "..."}}, ... (35 a 50 escenas)], "caption": "..."}}"""
 
 ETIQUETAS = {
     "leyenda": "🌙 Leyenda popular real: cuenta lo que dice la tradición, no un hecho comprobado.",
@@ -170,7 +172,12 @@ def validar(historia: dict) -> dict:
     ]
     if len(escenas) < 6:
         raise ValueError(f"La historia tiene solo {len(escenas)} escenas")
-    return {"titulo": historia["titulo"].strip(), "escenas": escenas, "caption": historia.get("caption", "")}
+    return {
+        "titulo": historia["titulo"].strip(),
+        "escenario": (historia.get("escenario") or "").strip(),
+        "escenas": escenas,
+        "caption": historia.get("caption", ""),
+    }
 
 
 def main() -> None:
@@ -227,6 +234,7 @@ def main() -> None:
         "tipo": clave,
         "titulo": historia["titulo"],
         "fuente": {"titulo": articulo["titulo"], "url": articulo["url"]},
+        "escenario": historia["escenario"],
         "escenas": historia["escenas"],
         "caption": ordenar_hashtags(caption),
     }

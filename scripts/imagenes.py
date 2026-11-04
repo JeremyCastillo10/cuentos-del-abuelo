@@ -34,28 +34,39 @@ def pixabay(consulta: str) -> list[dict]:
     if not clave:
         return []
     q = urllib.parse.urlencode(
-        {"key": clave, "q": consulta, "image_type": "photo", "orientation": "vertical", "safesearch": "true", "per_page": 30}
+        {"key": clave, "q": consulta, "image_type": "photo", "orientation": "vertical", "safesearch": "true",
+         "per_page": 40, "order": "popular"}
     )
     datos = http(f"https://pixabay.com/api/?{q}", headers=UA)
     return [
-        {"url": f["largeImageURL"], "autor": f["user"], "fuente": "Pixabay", "id": f"pixabay-{f['id']}"}
+        {"url": f["largeImageURL"], "autor": f["user"], "fuente": "Pixabay", "id": f"pixabay-{f['id']}",
+         "etiquetas": f.get("tags", "")}
         for f in datos.get("hits", [])
     ]
 
 
-def buscar(consulta: str, usadas: set[str]) -> dict | None:
-    """Prueba la búsqueda completa y, si no hay nada, versiones más cortas."""
-    palabras = consulta.split()
-    intentos = [consulta] + [" ".join(palabras[:n]) for n in range(len(palabras) - 1, 1, -1)]
-    for q in intentos:
-        for fuente in (pexels, pixabay):
+def puntaje(candidata: dict, consulta: str) -> int:
+    """Cuántas palabras de la búsqueda aparecen en las etiquetas de la foto."""
+    etiquetas = candidata.get("etiquetas", "").lower()
+    return sum(1 for p in consulta.lower().split() if len(p) > 2 and p in etiquetas)
+
+
+def buscar(consulta: str, usadas: set[str], respaldo: str = "") -> dict | None:
+    """La foto cuyas etiquetas más coinciden con la búsqueda; si ninguna coincide, el escenario de la historia."""
+    for q in [consulta] + ([respaldo] if respaldo and respaldo != consulta else []):
+        for fuente in (pixabay, pexels):
             try:
                 candidatas = [c for c in fuente(q) if c["id"] not in usadas]
             except Exception as e:
                 print(f"{fuente.__name__} falló con '{q}': {e}")
                 continue
-            if candidatas:
-                return random.choice(candidatas[:8])
+            if not candidatas:
+                continue
+            mejor = max(candidatas, key=lambda c: puntaje(c, q))
+            # Pixabay da etiquetas: exigir al menos la mitad de las palabras; Pexels no las da
+            minimo = max(1, len([p for p in q.split() if len(p) > 2]) // 2) if "etiquetas" in mejor else 0
+            if puntaje(mejor, q) >= minimo:
+                return mejor
     return None
 
 
@@ -98,7 +109,7 @@ def main() -> None:
         if consulta in por_consulta:
             escena["foto"] = por_consulta[consulta]
             continue
-        elegida = buscar(consulta, usadas)
+        elegida = buscar(consulta, usadas, episodio.get("escenario", ""))
         if not elegida:
             print(f"  {i:02d}: sin foto para '{consulta}', se usa la anterior")
             if i > 0 and episodio["escenas"][i - 1].get("foto"):
