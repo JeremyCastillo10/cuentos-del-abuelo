@@ -12,6 +12,25 @@ from comun import EPISODIO, RAIZ, cargar_env, env, http
 API = "https://graph.facebook.com/v21.0"
 
 
+_token = {}
+
+
+def token_pagina() -> str:
+    """Token de la página. Si en FB_PAGE_TOKEN se guardó un token de usuario, saca de él el de la página."""
+    if "t" not in _token:
+        token, pagina = env("FB_PAGE_TOKEN"), env("FB_PAGE_ID")
+        dueno = http(f"{API}/me?fields=id&access_token={token}").get("id")
+        if dueno != pagina:
+            cuentas = http(f"{API}/me/accounts?fields=id,name,access_token&limit=100&access_token={token}")["data"]
+            elegida = next((c for c in cuentas if c["id"] == pagina), None)
+            if not elegida:
+                raise SystemExit(f"El token no administra la página {pagina}: {[c['name'] for c in cuentas]}")
+            print("Usando el token de la página", elegida["name"], "(sacado del token de usuario)")
+            token = elegida["access_token"]
+        _token["t"] = token
+    return _token["t"]
+
+
 def _multipart(campos: dict, archivo: tuple[str, bytes, str]) -> tuple[bytes, str]:
     limite = uuid.uuid4().hex
     partes = []
@@ -30,7 +49,7 @@ def _multipart(campos: dict, archivo: tuple[str, bytes, str]) -> tuple[bytes, st
 
 def publicar_foto(ruta_png, mensaje: str) -> str:
     """Publica una imagen con texto en el muro de la página."""
-    pagina, token = env("FB_PAGE_ID"), env("FB_PAGE_TOKEN")
+    pagina, token = env("FB_PAGE_ID"), token_pagina()
     cuerpo, tipo = _multipart(
         {"message": mensaje, "access_token": token},
         ("cronica.png", ruta_png.read_bytes(), "image/png"),
@@ -44,7 +63,7 @@ def publicar_foto(ruta_png, mensaje: str) -> str:
 
 def comentar(post_id: str, mensaje: str) -> str | None:
     """Primer comentario en un post de la página (para poner ahí el enlace a la noticia)."""
-    token = env("FB_PAGE_TOKEN")
+    token = token_pagina()
     try:
         resultado = http(f"{API}/{post_id}/comments", {"message": mensaje, "access_token": token})
     except Exception as e:  # si el comentario falla, el post ya está publicado: no tumbar la crónica
@@ -56,7 +75,7 @@ def comentar(post_id: str, mensaje: str) -> str | None:
 
 def publicar_enlace(enlace: str, mensaje: str) -> str:
     """Publica texto con enlace a una noticia; Facebook muestra la foto del medio en la vista previa."""
-    pagina, token = env("FB_PAGE_ID"), env("FB_PAGE_TOKEN")
+    pagina, token = env("FB_PAGE_ID"), token_pagina()
     resultado = http(f"{API}/{pagina}/feed", {"message": mensaje, "link": enlace, "access_token": token})
     print("Publicado en Facebook:", resultado["id"])
     return resultado["id"]
@@ -64,7 +83,7 @@ def publicar_enlace(enlace: str, mensaje: str) -> str:
 
 def publicar_reel(ruta_mp4, descripcion: str) -> str:
     """Sube un Reel a la página en tres fases: iniciar, subir el archivo y publicar."""
-    pagina, token = env("FB_PAGE_ID"), env("FB_PAGE_TOKEN")
+    pagina, token = env("FB_PAGE_ID"), token_pagina()
     video = ruta_mp4.read_bytes()
     inicio = http(f"{API}/{pagina}/video_reels", {"upload_phase": "start", "access_token": token})
     video_id = inicio["video_id"]
@@ -99,7 +118,7 @@ def publicar_reel(ruta_mp4, descripcion: str) -> str:
 
 def publicar_video(ruta_mp4, titulo: str, descripcion: str) -> str:
     """Video normal en la página (los Reels de Facebook duran como máximo 90 segundos)."""
-    pagina, token = env("FB_PAGE_ID"), env("FB_PAGE_TOKEN")
+    pagina, token = env("FB_PAGE_ID"), token_pagina()
     cuerpo, tipo = _multipart(
         {"title": titulo, "description": descripcion, "published": "true", "access_token": token},
         ("historia.mp4", ruta_mp4.read_bytes(), "video/mp4"),
