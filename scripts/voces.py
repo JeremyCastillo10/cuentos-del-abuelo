@@ -62,14 +62,29 @@ def inicio_transcrito(pcm: bytes, segundos: int = 20) -> str | None:
     import urllib.request
     import uuid
 
-    clave = os.environ.get("GROQ_API_KEY")
-    if not clave:
-        return None
+    clave = os.environ.get("GROQ_API_KEY", "")
     audio = _wav_bytes(pcm[: 24000 * 2 * segundos])
     for modelo in ("whisper-large-v3-turbo", "whisper-large-v3"):
         texto = _transcribir(audio, modelo, clave)
         if texto is not None:
             return texto
+    return _transcribir_gemini(audio)
+
+
+def _transcribir_gemini(audio: bytes) -> str | None:
+    """Respaldo: Gemini también transcribe audio, con la misma clave gratis."""
+    cuerpo = {
+        "contents": [{"parts": [
+            {"inlineData": {"mimeType": "audio/wav", "data": base64.b64encode(audio).decode()}},
+            {"text": "Transcribe exactamente lo que se dice en este audio, en español. Solo el texto."},
+        ]}]
+    }
+    for modelo in ("gemini-flash-latest", "gemini-3.5-flash", "gemini-3.8-flash"):
+        try:
+            r = gemini(modelo, cuerpo, reintentos=2)
+            return r["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            print(f"  Gemini {modelo} no pudo transcribir ({e})")
     return None
 
 
@@ -77,6 +92,8 @@ def _transcribir(audio: bytes, modelo: str, clave: str) -> str | None:
     import urllib.request
     import uuid
 
+    if not clave:
+        return None
     limite = uuid.uuid4().hex
     partes = [
         f'--{limite}\r\nContent-Disposition: form-data; name="model"\r\n\r\n{modelo}\r\n'.encode(),
