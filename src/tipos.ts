@@ -20,7 +20,17 @@ export type Escena = {
   audio?: string;
   grupo?: number;
   palabras?: number;
+  // Para la música y los efectos: calma, tensión o giro (revelación). En los giros, "pantalla"
+  // es el dato clave que se muestra en grande.
+  momento?: Momento;
+  pantalla?: string;
 };
+
+export type Momento = "calma" | "tension" | "giro";
+
+// Si la historia no trae momentos (episodios viejos), gancho al inicio y un giro cada 5 escenas
+export const momentoDe = (e: Escena, k: number): Momento =>
+  e.momento ?? (k === 0 || k % 5 === 4 ? "giro" : k % 5 === 3 ? "tension" : "calma");
 
 export type Episodio = {
   fecha: string;

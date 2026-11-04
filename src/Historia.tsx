@@ -14,7 +14,8 @@ import {
 import { loadFont as cargarTitulo } from "@remotion/google-fonts/Creepster";
 import { loadFont as cargarTexto } from "@remotion/google-fonts/Montserrat";
 import { Siluetas } from "./Siluetas";
-import { CUENTA, INTRO, NOMBRE, PALETA, type Ambiente, type Escena, type HistoriaProps } from "./tipos";
+import { CUENTA, INTRO, NOMBRE, PALETA, momentoDe, type Ambiente, type Escena, type HistoriaProps } from "./tipos";
+import { Barras, Franjas, Grano, Sonidos, TextoPantalla, sacudida } from "./Efectos";
 
 const { fontFamily: fuenteTitulo } = cargarTitulo("normal", { weights: ["400"], subsets: ["latin"] });
 const { fontFamily: fuenteTexto } = cargarTexto("normal", { weights: ["800", "900"], subsets: ["latin"] });
@@ -123,8 +124,18 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
   // Luces de ventanas que parpadean de vez en cuando
   const luz = Math.sin(frame / 3) > 0.92 ? 0.2 : 0.85 + 0.15 * Math.sin(frame / 11);
 
-  // Acercamiento lento durante cada escena
-  const zoom = interpolate(t, [0, dur], [1.04, 1.1], { extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) });
+  const momento = momentoDe(escena, i);
+  const esGiro = !enIntro && !enOutro && momento === "giro";
+  // Acercamiento lento con paneo, alternando la dirección en cada escena; en los giros, un golpe de zoom
+  const avance = interpolate(t, [0, dur], [0, 1], { extrapolateRight: "clamp", easing: Easing.inOut(Easing.quad) });
+  const golpeZoom = esGiro ? interpolate(t, [0, 12], [0.1, 0], { extrapolateRight: "clamp", easing: Easing.out(Easing.cubic) }) : 0;
+  const zoom = 1.06 + 0.08 * avance + golpeZoom;
+  const lado = i % 2 === 0 ? 1 : -1;
+  const panX = lado * interpolate(avance, [0, 1], [-28, 28]);
+  const panY = interpolate(avance, [0, 1], [i % 3 === 0 ? 18 : -18, i % 3 === 0 ? -18 : 18]);
+  const golpe = esGiro ? sacudida(frame, t) : { x: 0, y: 0 };
+  const destello = esGiro && i > 0 ? interpolate(t, [0, 1, 4], [0.55, 0.35, 0], { extrapolateRight: "clamp" }) : 0;
+  const oscuro = momento === "tension" ? 0.25 : 0;
 
   // Subtítulos: las palabras se van iluminando al ritmo de la narración
   const palabras = escena.texto.split(" ");
@@ -139,25 +150,32 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
   const temblor = enIntro ? Math.sin(frame * 2.1) * 3 : 0;
   const salidaIntro = interpolate(frame, [INTRO - 10, INTRO], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const tOutro = frame - acc;
-  const musica = interpolate(frame, [0, 20, durationInFrames - 40, durationInFrames], [0, 0.22, 0.22, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000", fontFamily: fuenteTexto, overflow: "hidden" }}>
-      <AbsoluteFill style={{ transform: `scale(${zoom})` }}>
+      <AbsoluteFill style={{ transform: `translate(${panX + golpe.x}px, ${panY + golpe.y}px) scale(${zoom})` }}>
         {/* La foto anterior solo se dibuja mientras dura el fundido */}
         {mezcla < 1 && <Fondo escena={previa} frame={frame} luz={luz} />}
         <AbsoluteFill style={{ opacity: mezcla }}>
           <Fondo escena={escena} frame={frame} luz={luz} />
         </AbsoluteFill>
+        {esGiro && i > 0 && (
+          <Franjas frame={frame} t={t}>
+            <Fondo escena={escena} frame={frame} luz={luz} />
+          </Franjas>
+        )}
         <Niebla color={PALETA[escena.ambiente].niebla} frame={frame} />
       </AbsoluteFill>
 
       {/* Viñeta y relámpago */}
       <AbsoluteFill style={{ background: "radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(0,0,0,.85) 100%)" }} />
       <AbsoluteFill style={{ background: "#dfe8ff", opacity: relampago }} />
+      <AbsoluteFill style={{ background: "#000", opacity: oscuro }} />
+      <Grano frame={frame} />
+      {esGiro && i > 0 && <Barras frame={frame} t={t} />}
+      <AbsoluteFill style={{ background: "#fff", opacity: destello, mixBlendMode: "overlay" }} />
+      {enIntro && <Barras frame={frame} t={frame % 30} />}
+      {esGiro && escena.pantalla && <TextoPantalla texto={escena.pantalla} t={t} dur={dur} fps={fps} fuente={fuenteTexto} />}
 
       {/* Crédito de la foto (Pexels/Pixabay no lo exigen, pero se agradece) */}
       {!enIntro && !enOutro && escena.foto && (
@@ -225,7 +243,7 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
         </AbsoluteFill>
       )}
 
-      <Html5Audio src={staticFile("musica.wav")} loop volume={musica} />
+      <Sonidos escenas={escenas} inicios={inicios} duraciones={duraciones} fin={acc} total={durationInFrames} fps={fps} />
       {escenas.map((e, k) => {
         if (!e.audio) return null;
         // Con Gemini un audio cubre todo su grupo de escenas

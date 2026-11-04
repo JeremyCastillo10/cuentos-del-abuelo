@@ -76,6 +76,12 @@ Reglas:
    PROHIBIDO usar palabras abstractas (mystery, fear, disappearance, evidence, crime, death, ghost, history):
    no sirven para buscar fotos. Sin nombres propios ni personas reales identificables.
    Escenas seguidas que pasan en el mismo sitio deben repetir la misma búsqueda.
+   Y lleva "momento" (para la música y los efectos): "calma" (contexto, presentación), "tension"
+   (algo inquietante se acerca) o "giro" (el dato fuerte, la revelación, lo inesperado). La primera
+   escena es "giro". Más o menos 1 de cada 5 escenas es "giro"; las 1 o 2 anteriores a un giro, "tension".
+   En las escenas "giro" (y solo en esas) añade "pantalla": 1 a 4 palabras EN MAYÚSCULAS con el dato
+   clave para mostrar en grande, sacado del texto de la escena (ej. "1872", "NUNCA APARECIÓ",
+   "10 TRIPULANTES", "SIN RASTRO").
 9. "titulo": corto y llamativo (máx 40 caracteres), sin comillas.
    "escenario": 2 a 4 palabras en inglés del lugar principal de toda la historia (ej. "old sailing ship ocean").
 10. "caption" para Instagram y Facebook:
@@ -86,7 +92,7 @@ Reglas:
      #paranormal #historiasreales).
 
 Responde SOLO con JSON:
-{{"apto": true, "titulo": "...", "escenario": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "..."}}, ... (35 a 50 escenas)], "caption": "..."}}"""
+{{"apto": true, "titulo": "...", "escenario": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "...", "momento": "giro", "pantalla": "..."}}, {{"texto": "...", "ambiente": "...", "imagen": "...", "momento": "calma"}}, ... (35 a 50 escenas)], "caption": "..."}}"""
 
 ETIQUETAS = {
     "leyenda": "🌙 Leyenda popular real: cuenta lo que dice la tradición, no un hecho comprobado.",
@@ -160,6 +166,29 @@ def cargar_publicadas() -> list[str]:
     return json.loads(PUBLICADAS.read_text(encoding="utf-8")) if PUBLICADAS.exists() else []
 
 
+MOMENTOS = ("calma", "tension", "giro")
+
+
+def marcar_momentos(escenas: list[dict], originales: list[dict]) -> None:
+    """Copia "momento" y "pantalla" del modelo; si faltan, los reparte con una regla simple."""
+    originales = [e for e in originales if e.get("texto", "").strip()]
+    for e, o in zip(escenas, originales):
+        m = o.get("momento")
+        e["momento"] = m if m in MOMENTOS else ""
+        pantalla = " ".join(str(o.get("pantalla") or "").split()[:4]).upper()
+        if e["momento"] == "giro" and pantalla:
+            e["pantalla"] = pantalla[:28]
+    giros = sum(e["momento"] == "giro" for e in escenas)
+    if giros < max(2, len(escenas) // 8):
+        # El modelo no los marcó: gancho al inicio y un giro cada 5 escenas, con tensión antes
+        for k, e in enumerate(escenas):
+            e["momento"] = "giro" if k == 0 or k % 5 == 4 else ("tension" if k % 5 == 3 else "calma")
+    for e in escenas:
+        e["momento"] = e["momento"] or "calma"
+        if e["momento"] != "giro":
+            e.pop("pantalla", None)
+
+
 def validar(historia: dict) -> dict:
     escenas = [
         {
@@ -170,6 +199,7 @@ def validar(historia: dict) -> dict:
         for e in historia["escenas"]
         if e.get("texto", "").strip()
     ]
+    marcar_momentos(escenas, historia["escenas"])
     if len(escenas) < 6:
         raise ValueError(f"La historia tiene solo {len(escenas)} escenas")
     return {

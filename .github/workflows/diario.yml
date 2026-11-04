@@ -16,6 +16,10 @@ on:
         description: "Generar aunque hoy ya se haya publicado"
         type: boolean
         default: false
+      muestra:
+        description: "Solo una muestra corta (primeras 12 escenas), sin publicar"
+        type: boolean
+        default: false
 
 # Una ejecución a la vez
 concurrency:
@@ -38,7 +42,7 @@ jobs:
 
   historia:
     needs: revisar
-    if: (github.event_name == 'workflow_dispatch' && inputs.forzar) || needs.revisar.outputs.falta == 'si'
+    if: (github.event_name == 'workflow_dispatch' && (inputs.forzar || inputs.muestra)) || needs.revisar.outputs.falta == 'si'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
@@ -72,6 +76,10 @@ jobs:
         run: npx remotion browser ensure
       - name: Historia
         run: python scripts/historia.py
+      - name: Recortar para muestra
+        if: inputs.muestra
+        run: |
+          python3 -c "import json; p='public/episodio.json'; e=json.load(open(p)); e['escenas']=e['escenas'][:12]; json.dump(e, open(p,'w'), ensure_ascii=False, indent=2)"
       - name: Voces
         run: python scripts/voces.py
       - name: Fotos reales
@@ -87,12 +95,12 @@ jobs:
           retention-days: 14
       - id: ig
         name: Publicar en Instagram
-        if: github.event_name == 'schedule' || inputs.publicar
+        if: github.event_name == 'schedule' || (inputs.publicar && !inputs.muestra)
         env:
           GH_TOKEN: ${{ github.token }}
         run: python scripts/publicar.py
       - name: Publicar en Facebook
-        if: (github.event_name == 'schedule' || inputs.publicar) && env.FB_PAGE_TOKEN != ''
+        if: (github.event_name == 'schedule' || (inputs.publicar && !inputs.muestra)) && env.FB_PAGE_TOKEN != ''
         run: python scripts/facebook.py reel
       # Con la API de GitHub, no con git: public/episodio.json ya está modificado
       - name: Guardar fecha y título publicados
