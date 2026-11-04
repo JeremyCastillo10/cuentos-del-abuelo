@@ -1,0 +1,23 @@
+name: Comprobar cuentas
+
+# Solo lee el nombre de la página de Facebook y de la cuenta de Instagram; no publica nada.
+on:
+  workflow_dispatch:
+
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+      FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+      IG_USER_ID: ${{ secrets.IG_USER_ID }}
+      IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+    steps:
+      - name: Facebook
+        run: |
+          curl -s "https://graph.facebook.com/v21.0/$FB_PAGE_ID?fields=name&access_token=$FB_PAGE_TOKEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Facebook:', d.get('name') or d)"
+      - name: Instagram
+        run: |
+          curl -s "https://graph.facebook.com/v21.0/$IG_USER_ID?fields=username&access_token=$IG_ACCESS_TOKEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Instagram (graph.facebook):', d.get('username') or d)"
+          curl -s "https://graph.instagram.com/v21.0/me?fields=username&access_token=$IG_ACCESS_TOKEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Instagram (graph.instagram):', d.get('username') or d)"
