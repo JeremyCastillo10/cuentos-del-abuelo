@@ -37,7 +37,9 @@ def guardar(ruta: str, contenido: str, mensaje: str) -> None:
 
 def main() -> None:
     hoy = datetime.now(ZoneInfo("America/Santo_Domingo")).date().isoformat()
-    titulo = json.loads(EPISODIO.read_text(encoding="utf-8"))["titulo"]
+    episodio = json.loads(EPISODIO.read_text(encoding="utf-8"))
+    # Se guarda el artículo de Wikipedia usado, para no contar dos veces la misma historia
+    titulo = episodio.get("fuente", {}).get("titulo") or episodio["titulo"]
     guardar("data/episodio_publicado.json", json.dumps({"fecha": hoy}) + "\n", "Historia publicada")
     lista = RAIZ / "data" / "historias_publicadas.json"
     titulos = json.loads(lista.read_text(encoding="utf-8")) if lista.exists() else []

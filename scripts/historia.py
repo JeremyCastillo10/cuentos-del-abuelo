@@ -1,4 +1,4 @@
-"""Escribe la historia del día con Gemini (o Groq si Gemini no responde)."""
+"""Elige un artículo real de Wikipedia y lo narra con Gemini (o Groq si Gemini no responde)."""
 
 import json
 import os
@@ -6,77 +6,76 @@ import urllib.error
 from datetime import date
 
 from comun import EPISODIO, RAIZ, cargar_env, env, gemini, http, ordenar_hashtags
+from fuentes import elegir_articulo
 
 MODELOS_TEXTO = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.8-flash", "gemini-3.7-flash"]
 MODELOS_GROQ = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
 PUBLICADAS = RAIZ / "data" / "historias_publicadas.json"
 AMBIENTES = ["bosque", "casa", "carretera", "mar", "pueblo", "cementerio", "habitacion", "ciudad"]
 
-# Se rota por día para que la página tenga variedad
+# Se rota por día para que la página tenga variedad. Todas son historias REALES sacadas de Wikipedia.
 TIPOS = [
     (
-        "ficcion",
-        "Historia de terror o suspenso ORIGINAL, inventada por ti desde cero. No copies ni adaptes "
-        "cuentos, películas, series ni creepypastas conocidas. Personajes con nombres inventados.",
-    ),
-    (
-        "leyenda",
-        "Leyenda tradicional latinoamericana o caribeña (por ejemplo dominicanas como la Ciguapa, "
-        "el Bacá o el Galipote, o de otros países) contada con tus propias palabras. "
-        "Deja claro que es una leyenda popular, no un hecho comprobado.",
+        "crimen",
+        "Es un caso criminal REAL. Cuenta cómo pasó, cómo se investigó y cómo se descubrió la verdad. "
+        "Sin detalles gráficos de la violencia y con respeto hacia las víctimas; no nombres a familiares "
+        "ni a menores de edad.",
     ),
     (
         "misterio",
-        "Misterio o suceso inexplicado REAL y muy documentado (de conocimiento público, con al menos "
-        "décadas de antigüedad). Usa solo hechos ampliamente conocidos; no inventes datos, nombres ni "
-        "fechas. Nada sobre crímenes de personas privadas ni víctimas recientes.",
+        "Es un misterio o suceso REAL sin explicación clara. Cuenta lo que se sabe y las teorías que "
+        "recoge el texto, dejando claro qué está comprobado y qué no.",
     ),
     (
-        "crimen",
-        "Caso criminal REAL, famoso y muy documentado, de hace al menos 20 años y ya resuelto por la justicia "
-        "(con culpable juzgado). Cuenta cómo se investigó y cómo se descubrió la verdad. Usa SOLO hechos "
-        "ampliamente publicados: no inventes nombres, fechas, cifras ni diálogos. Sin detalles gráficos de la "
-        "violencia, con respeto hacia las víctimas; no nombres a familiares ni a testigos menores de edad.",
+        "leyenda",
+        "Es una leyenda tradicional REAL (existe y la gente la cuenta). Cuéntala como lo recoge el texto "
+        "y deja claro que es una leyenda popular, no un hecho comprobado.",
     ),
 ]
 
-INSTRUCCIONES = """Eres el narrador de "Cuentos del Abuelo", una página de historias narradas en video vertical
-(Reels de Instagram y Facebook) para público latino. Narras como un locutor profesional de historias de misterio:
+INSTRUCCIONES = """Eres el narrador de "Cuentos del Abuelo", una página de historias REALES narradas en video vertical
+(Instagram y Facebook) para público latino. Narras como un locutor profesional de historias de misterio:
 voz grave, ritmo pausado, frases que crean atmósfera. De vez en cuando puedes abrir con algo como
-"Esto me lo contó mi abuelo..." o "En mi pueblo todavía lo cuentan...", sin abusar. Escribe UNA historia.
+"Esta historia es real..." o "Todavía hoy nadie sabe qué pasó...", sin abusar.
+
+Te paso un artículo de Wikipedia. Narra la historia que cuenta.
 
 Reglas:
 1. {tipo}
-2. Dura entre 5 y 8 minutos narrada: entre {min_palabras} y {max_palabras} palabras en total. Usa ese
-   espacio para desarrollar bien la historia: contexto, personajes, pistas, tensión que crece y desenlace.
-3. Divide el texto en escenas: cada escena es una o dos frases (máx 30 palabras), fáciles de narrar.
-4. La PRIMERA escena es el gancho: una frase que obligue a seguir viendo (nada de saludos ni
-   "hoy les traigo"). Ej.: "En mi pueblo nadie abría la puerta después de las doce. Esa noche, alguien tocó."
-5. Construye tensión y termina con un giro o un final abierto que deje pensando.
-6. Nada de violencia gráfica, gore, suicidio ni contenido sexual. Apto para mayores de 13 años.
-7. Cada escena lleva "ambiente": uno de {ambientes} (el lugar donde ocurre esa parte).
+2. USA SOLO LOS HECHOS DEL ARTÍCULO. No inventes nombres, fechas, lugares, cifras, diálogos ni escenas.
+   Si el artículo no da un dato, no lo pongas. Puedes ordenar los hechos para crear suspenso y describir
+   el ambiente de forma general, pero nada que el artículo no diga.
+3. NO SIRVE y respondes solo {{"apto": false, "motivo": "..."}} si: el crimen ocurrió hace menos de 20 años,
+   las víctimas eran menores de edad, el caso no tiene sentencia y acusa a una persona con nombre,
+   o el artículo no da para una historia de al menos 5 minutos.
+4. Dura entre 5 y 8 minutos narrada: entre {min_palabras} y {max_palabras} palabras en total. Usa ese
+   espacio para desarrollar bien la historia con los datos del artículo: contexto, lugar, época,
+   personas implicadas, pistas, giros y desenlace.
+5. Divide el texto en escenas: cada escena es una o dos frases (máx 30 palabras), fáciles de narrar.
+6. La PRIMERA escena es el gancho: un hecho real que obligue a seguir viendo (nada de saludos ni
+   "hoy les traigo").
+7. Nada de violencia gráfica, gore ni contenido sexual. Apto para mayores de 13 años.
+8. Cada escena lleva "ambiente": uno de {ambientes} (el lugar donde ocurre esa parte).
    Y lleva "imagen": búsqueda EN INGLÉS de 3 a 6 palabras para encontrar una FOTO REAL de banco de imágenes
    que muestre lo que se narra (lugar, objeto, clima, hora), por ejemplo "abandoned wooden house night fog",
-   "old rural road dark trees", "candle on table dark room". Sin nombres propios ni personas reales
-   identificables: en casos reales describe el lugar o un objeto, nunca a la víctima ni al culpable.
+   "old police car night street", "courtroom wooden benches". Sin nombres propios ni personas reales
+   identificables: nunca la víctima ni el culpable; describe el lugar o un objeto.
    Escenas seguidas que pasan en el mismo sitio pueden repetir la misma búsqueda.
-8. "titulo": corto y llamativo (máx 40 caracteres), sin comillas.
-9. "caption" para Instagram y Facebook:
+9. "titulo": corto y llamativo (máx 40 caracteres), sin comillas.
+10. "caption" para Instagram y Facebook:
    - Primera línea: el gancho resumido (máx 110 caracteres).
    - Segunda línea: "{etiqueta}".
    - Tercera línea: una pregunta para que la gente comente.
-   - Al final 4 hashtags en español, sin tildes, según el tipo (ej. #terror #leyendas #misterio
-     #casosreales #truecrime #historiasdeterror).
-10. No repitas estas historias ya publicadas: {publicadas}
+   - Al final 4 hashtags en español, sin tildes, según el tipo (ej. #casosreales #truecrime #misterio
+     #leyendas #historiasreales).
 
 Responde SOLO con JSON:
-{{"titulo": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "..."}}], "caption": "..."}}"""
+{{"apto": true, "titulo": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "..."}}], "caption": "..."}}"""
 
 ETIQUETAS = {
-    "ficcion": "📖 Historia de ficción original.",
-    "leyenda": "🌙 Leyenda popular: cuenta lo que dice la tradición, no un hecho comprobado.",
+    "leyenda": "🌙 Leyenda popular real: cuenta lo que dice la tradición, no un hecho comprobado.",
     "misterio": "🔎 Caso real sin resolver, contado con lo que se sabe.",
-    "crimen": "⚖️ Caso real, basado en información pública del caso.",
+    "crimen": "⚖️ Caso real, contado con información pública.",
 }
 
 
@@ -162,37 +161,52 @@ def main() -> None:
         tipo=descripcion,
         ambientes=", ".join(AMBIENTES),
         etiqueta=ETIQUETAS[clave],
-        publicadas="; ".join(publicadas[-60:]) or "(ninguna)",
         # Narrando a unas 145 palabras por minuto: 5 min ≈ 730 palabras, 8 min ≈ 1150
         min_palabras=env("MIN_PALABRAS", "730"),
         max_palabras=env("MAX_PALABRAS", "1150"),
     )
-    usuario = f"Fecha: {hoy.isoformat()}. Escribe la historia de hoy (tipo: {clave})."
-
     minimo = int(env("MIN_PALABRAS", "730"))
-    mejor, palabras = None, 0
-    pedido = usuario
-    for intento in range(3):
-        historia = validar(json.loads(escribir(sistema, pedido)))
-        n = sum(len(e["texto"].split()) for e in historia["escenas"])
-        print(f"Intento {intento + 1}: {n} palabras")
-        if n > palabras:
-            mejor, palabras = historia, n
-        if n >= minimo * 0.92:
+    usados = set(publicadas)
+    descartados: set[str] = set()
+    historia, articulo = None, None
+    for _ in range(4):  # hasta 4 artículos distintos si alguno no sirve
+        articulo = elegir_articulo(clave, usados, descartados)
+        print(f"Artículo: {articulo['titulo']} ({len(articulo['texto'])} caracteres)")
+        usuario = f"ARTÍCULO DE WIKIPEDIA: «{articulo['titulo']}»\n\n{articulo['texto']}"
+        pedido, mejor, palabras = usuario, None, 0
+        for intento in range(3):
+            respuesta = json.loads(escribir(sistema, pedido))
+            if respuesta.get("apto") is False:
+                print(f"  No sirve: {respuesta.get('motivo', '')}")
+                break
+            candidata = validar(respuesta)
+            n = sum(len(e["texto"].split()) for e in candidata["escenas"])
+            print(f"  Intento {intento + 1}: {n} palabras")
+            if n > palabras:
+                mejor, palabras = candidata, n
+            if n >= minimo * 0.92:
+                break
+            # Corta: se pide más desarrollo, pero SIEMPRE con datos del artículo
+            pedido = (
+                f"{usuario}\n\nLa versión anterior tenía solo {n} palabras y debe tener al menos {minimo}. "
+                "Escríbela completa otra vez usando MÁS hechos del artículo (contexto, época, lugar, personas, "
+                "investigación, consecuencias). No inventes nada."
+            )
+        if mejor and palabras >= minimo * 0.75:
+            historia = mejor
             break
-        # Se quedó corta: se pide de nuevo, más larga y desarrollada
-        pedido = (
-            f"{usuario}\nLa versión anterior tenía solo {n} palabras y debe tener al menos {minimo}. "
-            "Escríbela completa otra vez, más desarrollada: más contexto, más detalles del lugar y de los "
-            "personajes, más momentos de tensión antes del desenlace."
-        )
-    historia = mejor
+        descartados.add(articulo["titulo"])
+    if not historia:
+        raise SystemExit("Ningún artículo dio para una historia real de 5 minutos hoy")
+
+    caption = f"{historia['caption'].strip()}\n📚 Basado en: Wikipedia — «{articulo['titulo']}»"
     episodio = {
         "fecha": hoy.isoformat(),
         "tipo": clave,
         "titulo": historia["titulo"],
+        "fuente": {"titulo": articulo["titulo"], "url": articulo["url"]},
         "escenas": historia["escenas"],
-        "caption": ordenar_hashtags(historia["caption"]),
+        "caption": ordenar_hashtags(caption),
     }
     EPISODIO.write_text(json.dumps(episodio, ensure_ascii=False, indent=2), encoding="utf-8")
     palabras = sum(len(e["texto"].split()) for e in episodio["escenas"])
