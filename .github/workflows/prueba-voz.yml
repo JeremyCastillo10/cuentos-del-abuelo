@@ -1,0 +1,35 @@
+name: Prueba de voz
+
+# Narra el cuento de ejemplo (public/episodio.json) y deja el audio para escucharlo. Unos 2 minutos.
+on:
+  workflow_dispatch:
+
+jobs:
+  voz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Dependencias
+        run: |
+          pip install edge-tts
+          sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
+      - name: Voces
+        run: python scripts/voces.py
+      - name: Juntar el audio en un solo archivo
+        run: |
+          ls public/audio/*.wav | sort | sed "s/^/file '/; s/$/'/" > lista.txt
+          sed -i "s#file 'public/#file '$PWD/public/#" lista.txt
+          ffmpeg -v error -f concat -safe 0 -i lista.txt -c:a libmp3lame -q:a 3 prueba-voz.mp3
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prueba-voz
+          path: prueba-voz.mp3
+          retention-days: 7

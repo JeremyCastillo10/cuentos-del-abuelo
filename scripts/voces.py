@@ -31,35 +31,101 @@ MODELOS_TTS = [
 ]
 VOZ_GEMINI = env("VOZ_GEMINI", "Algenib")  # masculina, grave y con textura
 ESCENAS_POR_TROZO = int(env("ESCENAS_POR_TROZO", "10"))  # ~1,5 min por pedido: 4-5 pedidos por historia
+# Indicación corta, en el formato que recomienda Google para sus voces ("Di de tal forma: texto")
 ESTILO = (
-    "como un locutor profesional de historias de misterio y terror, en español latino neutro: voz masculina "
-    "grave y envolvente, con emoción real. Crea suspenso: pausas dramáticas antes de los datos importantes, "
-    "baja la voz casi a un susurro en los momentos de tensión, sube la intensidad en los giros y suena "
-    "inquietante en las preguntas. Ritmo ágil, sin leer de forma plana"
+    "Narra como un locutor de historias de misterio, con voz grave, emoción y suspenso, "
+    "pausas dramáticas y susurrando en los momentos de tensión"
 )
+# Palabras de la indicación que NO deben oírse en el audio
+RASTROS = ("locutor", "narra como", "suspenso", "susurrando", "pausas dramáticas", "voz grave", "instrucci")
 
 
 class SinVozGemini(Exception):
     """Gemini no pudo narrar (sin cupo o caído)."""
 
 
-def voz_gemini(texto: str, modelos: list[str]) -> bytes:
-    """PCM 24 kHz con fundido. Si el modelo lee las instrucciones en voz alta, se descarta y reintenta."""
-    indicacion = (
-        f"Instrucción de actuación (NO la leas en voz alta): narra {ESTILO}.\n"
-        f'Lee en voz alta únicamente este texto, palabra por palabra: "{texto}"'
+def _wav_bytes(pcm: bytes) -> bytes:
+    import io
+    import wave
+
+    b = io.BytesIO()
+    with wave.open(b, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(24000)
+        w.writeframes(pcm)
+    return b.getvalue()
+
+
+def inicio_transcrito(pcm: bytes, segundos: int = 20) -> str | None:
+    """Transcribe el principio del audio con Whisper de Groq. None si no se puede comprobar."""
+    import urllib.request
+    import uuid
+
+    clave = os.environ.get("GROQ_API_KEY")
+    if not clave:
+        return None
+    audio = _wav_bytes(pcm[: 24000 * 2 * segundos])
+    for modelo in ("whisper-large-v3-turbo", "whisper-large-v3"):
+        texto = _transcribir(audio, modelo, clave)
+        if texto is not None:
+            return texto
+    return None
+
+
+def _transcribir(audio: bytes, modelo: str, clave: str) -> str | None:
+    import urllib.request
+    import uuid
+
+    limite = uuid.uuid4().hex
+    partes = [
+        f'--{limite}\r\nContent-Disposition: form-data; name="model"\r\n\r\n{modelo}\r\n'.encode(),
+        f'--{limite}\r\nContent-Disposition: form-data; name="language"\r\n\r\nes\r\n'.encode(),
+        f'--{limite}\r\nContent-Disposition: form-data; name="file"; filename="inicio.wav"\r\n'
+        "Content-Type: audio/wav\r\n\r\n".encode() + audio + b"\r\n",
+        f"--{limite}--\r\n".encode(),
+    ]
+    req = urllib.request.Request(
+        "https://api.groq.com/openai/v1/audio/transcriptions",
+        data=b"".join(partes),
+        headers={"Authorization": f"Bearer {clave}", "Content-Type": f"multipart/form-data; boundary={limite}"},
     )
-    # A unas 2,3 palabras por segundo; si dura mucho más, leyó también las instrucciones
-    maximo = len(texto.split()) / 1.6 + 4
-    esperas, repeticiones = 0, 0
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return json.loads(r.read()).get("text", "")
+    except Exception as e:
+        print(f"  Whisper {modelo} no disponible ({e})")
+        return None
+
+
+def leyo_indicacion(pcm: bytes, texto: str) -> bool | None:
+    """True si al principio del audio se oye la indicación; None si no se puede comprobar (sin Whisper)."""
+    oido = inicio_transcrito(pcm)
+    if oido is None:
+        return None
+    print(f"  Whisper oyó al principio: «{oido[:120]}»")
+    oido = oido.lower()
+    principio = " ".join(texto.lower().split()[:40])
+    # Solo cuenta si la palabra se oye pero no forma parte del propio texto de la historia
+    return any(r in oido and r not in principio for r in RASTROS)
+
+
+# Si no se puede escuchar el audio con Whisper, no se usa indicación (así nunca se cuela en el audio)
+_verificable = {"ok": True}
+
+
+def voz_gemini(texto: str, modelos: list[str]) -> bytes:
+    """PCM 24 kHz con fundido. Si se oye la indicación, se repite; si insiste, se narra sin indicación."""
+    con_estilo, repeticiones, esperas = _verificable["ok"], 0, 0
     while True:
         if not modelos:
             raise SinVozGemini("sin cupo en todos los modelos de voz")
+        pedido = f"{ESTILO}:\n{texto}" if con_estilo else texto
         try:
             r = gemini(
                 modelos[0],
                 {
-                    "contents": [{"parts": [{"text": indicacion}]}],
+                    "contents": [{"parts": [{"text": pedido}]}],
                     "generationConfig": {
                         "responseModalities": ["AUDIO"],
                         "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": VOZ_GEMINI}}},
@@ -81,11 +147,19 @@ def voz_gemini(texto: str, modelos: list[str]) -> bytes:
                 time.sleep(60)
             continue
         audio = base64.b64decode(r["candidates"][0]["content"]["parts"][0]["inlineData"]["data"])
-        if len(audio) / (24000 * 2) > maximo:
+        leida = leyo_indicacion(audio, texto) if con_estilo else False
+        if leida is None:
+            print("  no se puede escuchar el audio con Whisper: se narra sin indicación")
+            _verificable["ok"] = False
+            con_estilo = False
+            continue
+        if leida:
             repeticiones += 1
-            if repeticiones > 2:
-                raise SinVozGemini("el modelo sigue leyendo las instrucciones")
-            print("  leyó las instrucciones; repitiendo")
+            if repeticiones >= 2:
+                print("  sigue leyendo la indicación: se narra este trozo sin indicación")
+                con_estilo = False
+            else:
+                print("  se oyó la indicación en el audio; repitiendo")
             continue
         return suavizar(audio)
 
