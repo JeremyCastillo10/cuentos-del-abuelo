@@ -31,6 +31,21 @@ def token_pagina() -> str:
     return _token["t"]
 
 
+def _multipart_varios(campos: dict, archivos: list[tuple[str, str, bytes, str]]) -> tuple[bytes, str]:
+    """Cuerpo multipart con varios archivos: (campo, nombre, bytes, tipo)."""
+    limite = uuid.uuid4().hex
+    partes = []
+    for k, v in campos.items():
+        partes.append(f'--{limite}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
+    for campo, nombre, datos, mime in archivos:
+        partes.append(
+            f'--{limite}\r\nContent-Disposition: form-data; name="{campo}"; filename="{nombre}"\r\n'
+            f"Content-Type: {mime}\r\n\r\n".encode() + datos + b"\r\n"
+        )
+    partes.append(f"--{limite}--\r\n".encode())
+    return b"".join(partes), f"multipart/form-data; boundary={limite}"
+
+
 def _multipart(campos: dict, archivo: tuple[str, bytes, str]) -> tuple[bytes, str]:
     limite = uuid.uuid4().hex
     partes = []
@@ -116,12 +131,14 @@ def publicar_reel(ruta_mp4, descripcion: str) -> str:
     return video_id
 
 
-def publicar_video(ruta_mp4, titulo: str, descripcion: str) -> str:
-    """Video normal en la página (los Reels de Facebook duran como máximo 90 segundos)."""
+def publicar_video(ruta_mp4, titulo: str, descripcion: str, portada=None) -> str:
+    """Video en la página (Facebook lo muestra también como Reel), con título y miniatura propia."""
     pagina, token = env("FB_PAGE_ID"), token_pagina()
-    cuerpo, tipo = _multipart(
-        {"title": titulo, "description": descripcion, "published": "true", "access_token": token},
-        ("historia.mp4", ruta_mp4.read_bytes(), "video/mp4"),
+    archivos = [("source", "historia.mp4", ruta_mp4.read_bytes(), "video/mp4")]
+    if portada and portada.exists():
+        archivos.append(("thumb", "portada.jpg", portada.read_bytes(), "image/jpeg"))
+    cuerpo, tipo = _multipart_varios(
+        {"title": titulo, "description": descripcion, "published": "true", "access_token": token}, archivos
     )
     for intento in range(1, 4):
         req = urllib.request.Request(
@@ -159,4 +176,12 @@ if __name__ == "__main__":
         if duracion(ruta) <= 89:
             publicar_reel(ruta, episodio.get("caption", ""))
         else:
-            publicar_video(ruta, episodio.get("titulo", ""), episodio.get("caption", ""))
+            video_id = publicar_video(
+                ruta, episodio.get("titulo_facebook") or episodio.get("titulo", ""), episodio.get("caption", ""),
+                RAIZ / "out" / "portada.jpg",
+            )
+            fuentes = (episodio.get("fuente") or {}).get("fuentes") or []
+            if fuentes:
+                # Las fuentes en el primer comentario: da confianza y el comentario suma interacción
+                comentar(video_id, "📚 Fuentes consultadas para esta historia: " + ", ".join(fuentes[:8])
+                         + "\n\n¿Conocías este caso? Cuéntanos qué crees que pasó 👇")

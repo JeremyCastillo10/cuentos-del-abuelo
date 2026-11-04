@@ -4,6 +4,8 @@ import {
   Easing,
   Html5Audio,
   Img,
+  Loop,
+  OffthreadVideo,
   Sequence,
   interpolate,
   spring,
@@ -87,9 +89,30 @@ const Foto: React.FC<{ archivo: string }> = ({ archivo }) => (
   </AbsoluteFill>
 );
 
-// Fondo de una escena: su foto si la hay; si no, el escenario dibujado
-const Fondo: React.FC<{ escena: Escena; frame: number; luz: number }> = ({ escena, frame, luz }) =>
-  escena.foto ? <Foto archivo={escena.foto.archivo} /> : <Cielo ambiente={escena.ambiente} frame={frame} t={frame} luz={luz} />;
+// Video de archivo a pantalla completa, algo más lento (más cinematográfico) y en bucle si la escena es larga
+const VELOCIDAD_VIDEO = 0.85;
+const Video: React.FC<{ archivo: string; segundos: number; fps: number }> = ({ archivo, segundos, fps }) => (
+  <AbsoluteFill>
+    <Loop durationInFrames={Math.max(24, Math.floor((segundos * fps) / VELOCIDAD_VIDEO) - 2)} layout="none">
+      <OffthreadVideo src={staticFile(archivo)} muted playbackRate={VELOCIDAD_VIDEO} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+    </Loop>
+    <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(5,8,20,.55) 0%, rgba(5,8,20,.15) 35%, rgba(5,8,20,.2) 60%, rgba(0,0,0,.75) 100%)" }} />
+  </AbsoluteFill>
+);
+
+// Fondo de una escena: su video, su foto o, si no hay, el escenario dibujado.
+// "desde" es el frame en que empieza ese medio (si varias escenas seguidas lo comparten, sigue sin cortes).
+const Fondo: React.FC<{ escena: Escena; frame: number; luz: number; desde: number; fps: number }> = ({ escena, frame, luz, desde, fps }) => {
+  if (escena.video)
+    return (
+      <Sequence from={desde} layout="none">
+        <Video archivo={escena.video.archivo} segundos={escena.video.segundos} fps={fps} />
+      </Sequence>
+    );
+  return escena.foto ? <Foto archivo={escena.foto.archivo} /> : <Cielo ambiente={escena.ambiente} frame={frame} t={frame} luz={luz} />;
+};
+
+const medioDe = (e: Escena) => e.video?.archivo ?? e.foto?.archivo ?? e.ambiente;
 
 export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
   const frame = useCurrentFrame();
@@ -113,7 +136,13 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
 
   // Fundido entre lugares cuando cambia el ambiente
   const previa = i > 0 ? escenas[i - 1] : escena;
-  const claveFondo = (e: Escena) => e.foto?.archivo ?? e.ambiente;
+  const claveFondo = medioDe;
+  // Primer frame del medio de una escena (escenas seguidas con el mismo video lo continúan)
+  const desdeMedio = (k: number) => {
+    let j = k;
+    while (j > 0 && medioDe(escenas[j - 1]) === medioDe(escenas[k])) j--;
+    return inicios[j] ?? 0;
+  };
   const cambio = !enIntro && claveFondo(previa) !== claveFondo(escena);
   const mezcla = cambio ? interpolate(t, [0, 24], [0, 1], { extrapolateRight: "clamp" }) : 1;
 
@@ -146,22 +175,19 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
   const desde = tramo * TRAMO;
   const enPantalla = palabras.slice(desde, desde + TRAMO);
 
-  const entraTitulo = spring({ frame, fps, config: { damping: 9 } });
-  const temblor = enIntro ? Math.sin(frame * 2.1) * 3 : 0;
-  const salidaIntro = interpolate(frame, [INTRO - 10, INTRO], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const tOutro = frame - acc;
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#000", fontFamily: fuenteTexto, overflow: "hidden" }}>
       <AbsoluteFill style={{ transform: `translate(${panX + golpe.x}px, ${panY + golpe.y}px) scale(${zoom})` }}>
         {/* La foto anterior solo se dibuja mientras dura el fundido */}
-        {mezcla < 1 && <Fondo escena={previa} frame={frame} luz={luz} />}
+        {mezcla < 1 && <Fondo escena={previa} frame={frame} luz={luz} desde={desdeMedio(Math.max(0, i - 1))} fps={fps} />}
         <AbsoluteFill style={{ opacity: mezcla }}>
-          <Fondo escena={escena} frame={frame} luz={luz} />
+          <Fondo escena={escena} frame={frame} luz={luz} desde={desdeMedio(i)} fps={fps} />
         </AbsoluteFill>
         {esGiro && i > 0 && (
           <Franjas frame={frame} t={t}>
-            <Fondo escena={escena} frame={frame} luz={luz} />
+            <Fondo escena={escena} frame={frame} luz={luz} desde={desdeMedio(i)} fps={fps} />
           </Franjas>
         )}
         <Niebla color={PALETA[escena.ambiente].niebla} frame={frame} />
@@ -178,9 +204,24 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
       {esGiro && escena.pantalla && <TextoPantalla texto={escena.pantalla} t={t} dur={dur} fps={fps} fuente={fuenteTexto} />}
 
       {/* Crédito de la foto (Pexels/Pixabay no lo exigen, pero se agradece) */}
-      {!enIntro && !enOutro && escena.foto && (
+      {!enIntro && !enOutro && (escena.video || escena.foto) && (
         <div style={{ position: "absolute", bottom: 70, left: 50, color: "rgba(255,255,255,.55)", fontSize: 22, fontWeight: 800 }}>
-          Foto: {escena.foto.autor} · {escena.foto.fuente}
+          {escena.video ? "Video" : "Foto"}: {(escena.video ?? escena.foto)!.autor} · {(escena.video ?? escena.foto)!.fuente}
+        </div>
+      )}
+
+      {/* Título sobre la primera escena (la narración ya empezó: no se hace esperar a nadie) */}
+      {!enIntro && i === 0 && (
+        <div
+          style={{
+            position: "absolute", top: 230, left: 50, right: 50, textAlign: "center",
+            fontFamily: fuenteTitulo, color: ROJO, fontSize: 82, lineHeight: 1.05,
+            textShadow: "0 0 24px rgba(215,38,61,.6), 0 5px 0 #000",
+            opacity: interpolate(t, [0, 6, dur - 10, dur], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+            transform: `scale(${0.8 + 0.2 * spring({ frame: t, fps, config: { damping: 12 } })})`,
+          }}
+        >
+          {episodio.titulo}
         </div>
       )}
 
@@ -191,26 +232,6 @@ export const Historia: React.FC<HistoriaProps> = ({ episodio, duraciones }) => {
         </div>
         <div style={{ width: 120, height: 5, background: ROJO, margin: "14px auto 0" }} />
       </div>
-
-      {/* Tarjeta de título */}
-      {enIntro && (
-        <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", opacity: salidaIntro, background: "rgba(0,0,0,.45)" }}>
-          <div
-            style={{
-              fontFamily: fuenteTitulo,
-              color: ROJO,
-              fontSize: 128,
-              lineHeight: 1.05,
-              textAlign: "center",
-              padding: "0 70px",
-              textShadow: "0 0 30px rgba(215,38,61,.6), 0 6px 0 #000",
-              transform: `scale(${0.6 + 0.4 * entraTitulo}) translateX(${temblor}px)`,
-            }}
-          >
-            {episodio.titulo}
-          </div>
-        </AbsoluteFill>
-      )}
 
       {/* Subtítulos */}
       {!enIntro && !enOutro && (

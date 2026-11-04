@@ -1,6 +1,9 @@
-"""Busca en Wikipedia en español un artículo real (caso, misterio o leyenda) para contar.
+"""Elige un caso real (misterio, crimen, aparición o leyenda) y reúne sus hechos de varias fuentes.
 
-La historia se narra solo con los hechos de ese artículo, y se cita en el post.
+1. Gemini con búsqueda de Google investiga el caso en la web (prensa, sitios especializados,
+   archivos) y devuelve un dossier con los hechos y las fuentes consultadas.
+2. Si eso no funciona (sin cupo, pocas fuentes), se usa Wikipedia en español o en inglés.
+La historia se narra solo con esos hechos y las fuentes se citan en el post.
 """
 
 import random
@@ -113,6 +116,73 @@ def _articulo(titulo: str) -> dict | None:
         "texto": texto[:LIMITE_TEXTO],
         "url": "https://es.wikipedia.org/wiki/" + urllib.parse.quote(titulo.replace(" ", "_")),
     }
+
+
+INVESTIGAR = """Investiga a fondo en internet este caso real: «{tema}» ({tipo}).
+Busca en VARIAS fuentes fiables y distintas (prensa, revistas, sitios de historia, archivos, libros,
+documentales), no solo en Wikipedia. Escribe en español un dossier de hechos de 1500 a 2500 palabras con:
+- Contexto: época, lugar, personas implicadas (sin nombrar a menores ni a familiares de víctimas).
+- La cronología detallada de lo que pasó, con fechas, cifras y lugares exactos.
+- Los detalles más extraños, inquietantes o sorprendentes que recogen las fuentes.
+- La investigación, las pistas, las teorías y qué está comprobado y qué no.
+- Cómo terminó o en qué quedó, y qué sigue sin respuesta hoy.
+Solo hechos que digan las fuentes; si las fuentes no coinciden, dilo. Nada inventado.
+Si el caso no es real o casi no hay información fiable, responde solo: NO_HAY_DATOS"""
+
+MODELOS_INVESTIGAR = ["gemini-3.5-flash", "gemini-flash-latest"]
+
+
+def investigar(tema: str, tipo: str) -> dict | None:
+    """Dossier del caso con fuentes de la web (Gemini + búsqueda de Google). None si no se pudo."""
+    import os
+
+    from comun import gemini
+
+    if not os.environ.get("GEMINI_API_KEY"):
+        return None
+    cuerpo = {
+        "contents": [{"parts": [{"text": INVESTIGAR.format(tema=tema, tipo=tipo)}]}],
+        "tools": [{"google_search": {}}],
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 8000},
+    }
+    for modelo in MODELOS_INVESTIGAR:
+        try:
+            r = gemini(modelo, cuerpo, reintentos=2)
+        except Exception as e:
+            print(f"Investigación con {modelo} no disponible ({e})")
+            continue
+        candidato = r["candidates"][0]
+        texto = "".join(p.get("text", "") for p in candidato.get("content", {}).get("parts", []))
+        trozos = candidato.get("groundingMetadata", {}).get("groundingChunks", [])
+        fuentes = []
+        for t in trozos:
+            web = t.get("web", {})
+            nombre = (web.get("title") or "").strip()
+            if nombre and nombre.lower() not in (f.lower() for f in fuentes):
+                fuentes.append(nombre)
+        if "NO_HAY_DATOS" in texto[:50] or len(texto) < 4500:
+            print(f"  Investigación de '{tema}' corta ({len(texto)} caracteres): no sirve")
+            return None
+        if len(fuentes) < 3:
+            print(f"  Investigación de '{tema}' con solo {len(fuentes)} fuentes: no sirve")
+            return None
+        print(f"  Investigado en {len(fuentes)} fuentes: {', '.join(fuentes[:8])}")
+        return {"titulo": tema, "texto": texto[:LIMITE_TEXTO], "url": "", "fuentes": fuentes[:8]}
+    return None
+
+
+def elegir_caso(tipo: str, usados: set[str], descartados: set[str]) -> dict:
+    """Primero un caso conocido investigado en la web; si no se puede, un artículo de Wikipedia."""
+    semillas = [t for t in SEMILLAS[tipo] if t not in usados and t not in descartados]
+    random.shuffle(semillas)
+    for tema in semillas[:2]:
+        print(f"Investigando en la web: {tema}")
+        caso = investigar(tema, tipo)
+        if caso:
+            return caso
+        descartados.add(tema)
+    print("Sin investigación web; se usa Wikipedia")
+    return elegir_articulo(tipo, usados, descartados)
 
 
 def elegir_articulo(tipo: str, usados: set[str], descartados: set[str]) -> dict:

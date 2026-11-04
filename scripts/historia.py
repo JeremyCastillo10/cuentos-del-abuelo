@@ -7,7 +7,7 @@ import urllib.error
 from datetime import date
 
 from comun import EPISODIO, RAIZ, cargar_env, env, gemini, http, ordenar_hashtags
-from fuentes import elegir_articulo
+from fuentes import elegir_caso
 
 MODELOS_TEXTO = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.8-flash", "gemini-3.7-flash"]
 MODELOS_GROQ = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
@@ -44,55 +44,70 @@ TIPOS.append(
     )
 )
 
-INSTRUCCIONES = """Eres el narrador de "Cuentos del Abuelo", una página de historias REALES narradas en video vertical
-(Instagram y Facebook) para público latino. Narras como un locutor profesional de historias de misterio:
-voz grave, ritmo pausado, frases que crean atmósfera. De vez en cuando puedes abrir con algo como
-"Esta historia es real..." o "Todavía hoy nadie sabe qué pasó...", sin abusar.
+INSTRUCCIONES = """Eres el guionista y narrador de "Cuentos del Abuelo", una página de Facebook e Instagram de
+historias REALES de misterio, crímenes y apariciones para público latino. Tu trabajo es que la gente NO PUEDA
+DEJAR DE VER: cada segundo que alguien sigue mirando es lo que hace crecer la página.
 
-Te paso un artículo de Wikipedia. Narra la historia que cuenta.
+Te paso la información de un caso real. Cuéntalo como un gran narrador de misterio de YouTube: cercano,
+intrigante, con suspenso, hablándole directamente a quien escucha.
 
-Reglas:
+Reglas de VERDAD (nunca se rompen):
 1. {tipo}
-2. USA SOLO LOS HECHOS DEL ARTÍCULO. No inventes nombres, fechas, lugares, cifras, diálogos ni escenas.
-   Si el artículo no da un dato, no lo pongas. Puedes ordenar los hechos para crear suspenso y describir
-   el ambiente de forma general, pero nada que el artículo no diga.
-3. NO SIRVE y respondes solo {{"apto": false, "motivo": "..."}} si: el crimen ocurrió hace menos de 20 años,
-   las víctimas eran menores de edad, el caso no tiene sentencia y acusa a una persona con nombre,
-   o el artículo no da para una historia de al menos 5 minutos.
-4. Dura entre 5 y 8 minutos narrada: entre {min_palabras} y {max_palabras} palabras en total. Usa ese
-   espacio para desarrollar bien la historia con los datos del artículo: contexto, lugar, época,
-   personas implicadas, pistas, giros y desenlace.
-5. Divide el texto en ENTRE 35 Y 50 ESCENAS. Cada escena es una o dos frases de 18 a 28 palabras, fáciles
-   de narrar. Menos de 35 escenas es demasiado corto: sigue contando con más hechos del artículo.
-6. La PRIMERA escena es el gancho: el hecho más impactante o inquietante del caso, contado en una frase
-   que obligue a seguir viendo (nada de saludos, presentaciones ni "hoy les traigo").
-   RITMO DE HISTORIA QUE ATRAPA: frases cortas y directas; cada 4 o 5 escenas un giro, un dato sorprendente
-   o una pregunta que deje intriga ("Pero eso no fue lo más extraño..."); nada de párrafos de relleno.
-7. Nada de violencia gráfica, gore ni contenido sexual. Apto para mayores de 13 años.
-8. Cada escena lleva "ambiente": uno de {ambientes} (el lugar donde ocurre esa parte).
-   Y lleva "imagen": búsqueda EN INGLÉS de 2 a 4 palabras CONCRETAS de lo que se VE en esa escena:
-   un objeto o lugar físico + (opcional) hora o clima. Ejemplos buenos: "sailing ship storm",
-   "abandoned farmhouse night", "old courthouse", "police car night", "foggy forest", "lighthouse".
-   PROHIBIDO usar palabras abstractas (mystery, fear, disappearance, evidence, crime, death, ghost, history):
-   no sirven para buscar fotos. Sin nombres propios ni personas reales identificables.
-   Escenas seguidas que pasan en el mismo sitio deben repetir la misma búsqueda.
-   Y lleva "momento" (para la música y los efectos): "calma" (contexto, presentación), "tension"
-   (algo inquietante se acerca) o "giro" (el dato fuerte, la revelación, lo inesperado). La primera
-   escena es "giro". Más o menos 1 de cada 5 escenas es "giro"; las 1 o 2 anteriores a un giro, "tension".
-   En las escenas "giro" (y solo en esas) añade "pantalla": 1 a 4 palabras EN MAYÚSCULAS con el dato
-   clave para mostrar en grande, sacado del texto de la escena (ej. "1872", "NUNCA APARECIÓ",
-   "10 TRIPULANTES", "SIN RASTRO").
-9. "titulo": corto y llamativo (máx 40 caracteres), sin comillas.
-   "escenario": 2 a 4 palabras en inglés del lugar principal de toda la historia (ej. "old sailing ship ocean").
-10. "caption" para Instagram y Facebook:
-   - Primera línea: el gancho resumido (máx 110 caracteres).
-   - Segunda línea: "{etiqueta}".
-   - Tercera línea: una pregunta para que la gente comente.
-   - Al final 4 hashtags en español, sin tildes, según el tipo (ej. #casosreales #truecrime #misterio
-     #paranormal #historiasreales).
+2. USA SOLO LOS HECHOS DE LA INFORMACIÓN. No inventes nombres, fechas, lugares, cifras, diálogos ni escenas.
+   Puedes ordenar los hechos para crear suspenso, describir el ambiente de forma general y plantear preguntas,
+   pero nada que la información no diga. Si las fuentes no coinciden, dilo ("unos dicen... otros...").
+3. Responde {{"apto": false, "motivo": "..."}} si el crimen tiene menos de 20 años, si las víctimas eran
+   menores de edad, si acusa sin sentencia a una persona con nombre, o si no da para 5 minutos.
+4. Nada de violencia gráfica, gore ni contenido sexual. Apto para mayores de 13 años.
+
+Reglas para ATRAPAR (lo más importante después de la verdad):
+5. Duración: entre {min_palabras} y {max_palabras} palabras en total, en ENTRE 35 Y 50 ESCENAS de una o dos
+   frases (18 a 28 palabras cada una). Desarrolla bien: contexto, personas, pistas, giros, desenlace.
+6. Los primeros 3 segundos deciden todo. La PRIMERA escena es un gancho brutal: el dato más impactante,
+   extraño o perturbador del caso, dicho de golpe, o una pregunta que nadie puede ignorar. Ejemplos de forma
+   (no de contenido): "En 1872 encontraron un barco navegando solo... y la comida todavía estaba caliente."
+   / "Diez personas desaparecieron en medio del océano, y nadie ha podido explicar cómo."
+   PROHIBIDO empezar con saludos, "hoy les traigo", "bienvenidos", fechas sueltas o contexto aburrido.
+7. La SEGUNDA escena promete algo para el final: "Y lo que descubrieron después es todavía más extraño."
+8. Bucles abiertos: cada 4 o 5 escenas abre una pregunta o adelanta algo sin contarlo todavía
+   ("Pero eso no fue lo más raro...", "Nadie se fijó en un detalle que lo cambiaba todo...").
+   Cierra cada bucle más adelante con un dato real.
+9. Háblale a quien escucha: "imagina que...", "¿tú qué habrías hecho?", "fíjate en esto". Frases cortas,
+   verbos fuertes, detalles concretos que se puedan ver y oír (el frío, el silencio, una puerta, una luz).
+   Nada de frases de enciclopedia ni listas de datos sin emoción.
+10. Hacia la mitad (escena 15 a 20), una frase corta y natural para retener: "Quédate hasta el final, porque
+   lo que encontraron en ... nadie lo esperaba." (con un hecho real que contarás después).
+11. Final: cierra con el dato más inquietante que queda, y en la última escena pide la opinión:
+   "¿Tú qué crees que pasó? Te leo en los comentarios." Sin despedidas largas.
+12. Cada escena lleva "ambiente": uno de {ambientes}.
+   Y lleva "imagen": búsqueda EN INGLÉS de 2 a 4 palabras CONCRETAS de lo que se VE en esa escena
+   (sirve para buscar fotos y videos de archivo): objeto o lugar físico + (opcional) hora, clima o acción.
+   Ejemplos: "sailing ship storm", "old wooden door opening", "police car night", "foggy forest walking",
+   "candle flame dark", "rain window night". PROHIBIDO lo abstracto (mystery, fear, crime, death, ghost,
+   history) y los nombres propios. Escenas seguidas en el mismo sitio repiten la misma búsqueda.
+   Y lleva "momento": "calma" (contexto), "tension" (algo inquietante se acerca) o "giro" (el dato fuerte,
+   la revelación). La primera escena es "giro". Más o menos 1 de cada 5 es "giro"; las 1 o 2 anteriores
+   a un giro, "tension". En las escenas "giro" (y solo en esas) añade "pantalla": 1 a 4 palabras EN
+   MAYÚSCULAS con el dato clave, sacado del texto de la escena ("1872", "NUNCA APARECIERON", "SIN RASTRO").
+13. "titulo": corto y llamativo (máx 40 caracteres), sin comillas. Que dé ganas de verlo.
+   "escenario": 2 a 4 palabras en inglés del lugar principal de la historia (ej. "old sailing ship ocean").
+14. "portada": la frase de la miniatura del video, 2 a 4 palabras EN MAYÚSCULAS que creen curiosidad sin
+   contar el final ("NADIE VOLVIÓ", "¿QUIÉN ESTABA AHÍ?", "EL BARCO VACÍO"). Y "portada_imagen": búsqueda
+   en inglés de 2 a 4 palabras de la imagen más impactante de la historia para esa miniatura.
+15. "titulo_facebook": título del video para Facebook (máx 90 caracteres) con el nombre del caso y gancho,
+   pensado para la búsqueda: "El misterio del Mary Celeste: el barco que apareció sin nadie a bordo".
+16. "caption" para Facebook e Instagram, en este orden:
+   - Línea 1: gancho fuerte de máx 110 caracteres con el nombre del caso o el lugar (es lo que se ve sin
+     pulsar "ver más"). Puede empezar con un emoji relacionado.
+   - Líneas 2 y 3: dos frases cortas que aumenten la intriga SIN contar el final.
+   - Línea 4: "{etiqueta}".
+   - Línea 5: una pregunta concreta para que la gente comente (opinión o "¿lo conocías?").
+   - Línea 6: "👉 Síguenos para una historia real nueva cada noche."
+   - Al final 4 hashtags en español, sin tildes, del tema y del lugar (ej. #casosreales #misterio
+     #sinresolver #historiasreales #paranormal #truecrime).
 
 Responde SOLO con JSON:
-{{"apto": true, "titulo": "...", "escenario": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "...", "momento": "giro", "pantalla": "..."}}, {{"texto": "...", "ambiente": "...", "imagen": "...", "momento": "calma"}}, ... (35 a 50 escenas)], "caption": "..."}}"""
+{{"apto": true, "titulo": "...", "titulo_facebook": "...", "portada": "...", "portada_imagen": "...", "escenario": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "...", "momento": "giro", "pantalla": "..."}}, {{"texto": "...", "ambiente": "...", "imagen": "...", "momento": "calma"}}, ... (35 a 50 escenas)], "caption": "..."}}"""
 
 ETIQUETAS = {
     "leyenda": "🌙 Leyenda popular real: cuenta lo que dice la tradición, no un hecho comprobado.",
@@ -105,12 +120,17 @@ ETIQUETAS = {
 def groq_texto(sistema: str, usuario: str, esperas: int = 0) -> str:
     """Respaldo con Groq: prueba varios modelos y devuelve el JSON como texto."""
     errores = []
+    # Groq gratis tiene un límite de ~8000 tokens por minuto (entrada + salida): recortar la información
+    usuario = usuario[:7000]
     for modelo in env("GROQ_MODELOS", ",".join(MODELOS_GROQ)).split(","):
         for modo_json in (True, False):
             cuerpo = {
                 "model": modelo,
                 "messages": [{"role": "system", "content": sistema}, {"role": "user", "content": usuario}],
                 "temperature": 1.0,
+                # Poco razonamiento y salida acotada: así la petición cabe en el límite por minuto
+                "reasoning_effort": "low",
+                "max_completion_tokens": 3800,
             }
             if modo_json:
                 cuerpo["response_format"] = {"type": "json_object"}
@@ -137,6 +157,8 @@ def groq_texto(sistema: str, usuario: str, esperas: int = 0) -> str:
                     return groq_texto(sistema, usuario, esperas)
                 if e.code != 400:
                     break
+                # JSON mal formado: antes de reintentar sin modo JSON, esperar a que se libere el límite por minuto
+                time.sleep(65)
             except (ValueError, KeyError) as e:
                 errores.append(f"{modelo}: respuesta no válida ({e})")
     raise RuntimeError("Ningún modelo de Groq respondió: " + " | ".join(errores))
@@ -152,7 +174,7 @@ def escribir(sistema: str, usuario: str) -> str:
     for modelo in env("GEMINI_MODELOS_TEXTO", ",".join(MODELOS_TEXTO)).split(","):
         try:
             print("Escribiendo historia con", modelo)
-            r = gemini(modelo, cuerpo, reintentos=2)
+            r = gemini(modelo, cuerpo, reintentos=4)
             return r["candidates"][0]["content"]["parts"][0]["text"]
         except Exception as e:
             print(f"{modelo} no disponible ({e})")
@@ -207,6 +229,9 @@ def validar(historia: dict) -> dict:
         "escenario": (historia.get("escenario") or "").strip(),
         "escenas": escenas,
         "caption": historia.get("caption", ""),
+        "titulo_facebook": (historia.get("titulo_facebook") or historia["titulo"]).strip()[:95],
+        "portada": " ".join(str(historia.get("portada") or historia["titulo"]).split()[:5]).upper(),
+        "portada_imagen": (historia.get("portada_imagen") or historia.get("escenario") or "").strip(),
     }
 
 
@@ -229,9 +254,9 @@ def main() -> None:
     descartados: set[str] = set()
     historia, articulo = None, None
     for _ in range(4):  # hasta 4 artículos distintos si alguno no sirve
-        articulo = elegir_articulo(clave, usados, descartados)
+        articulo = elegir_caso(clave, usados, descartados)
         print(f"Artículo: {articulo['titulo']} ({len(articulo['texto'])} caracteres)")
-        usuario = f"ARTÍCULO DE WIKIPEDIA: «{articulo['titulo']}»\n\n{articulo['texto']}"
+        usuario = f"INFORMACIÓN DEL CASO: «{articulo['titulo']}»\n\n{articulo['texto']}"
         pedido, mejor, palabras = usuario, None, 0
         for intento in range(3):
             respuesta = json.loads(escribir(sistema, pedido))
@@ -249,7 +274,7 @@ def main() -> None:
             pedido = (
                 f"{usuario}\n\nLa versión anterior tenía solo {n} palabras y debe tener al menos {minimo}. "
                 "Escríbela completa otra vez usando MÁS hechos del artículo (contexto, época, lugar, personas, "
-                "investigación, consecuencias). No inventes nada."
+                "investigación, consecuencias) y con el gancho y los bucles de las reglas. No inventes nada."
             )
         if mejor and palabras >= minimo * 0.75:
             historia = mejor
@@ -258,12 +283,16 @@ def main() -> None:
     if not historia:
         raise SystemExit("Ningún artículo dio para una historia real de 5 minutos hoy")
 
-    caption = f"{historia['caption'].strip()}\n📚 Basado en: Wikipedia — «{articulo['titulo']}»"
+    fuentes = articulo.get("fuentes") or ["Wikipedia"]
+    caption = f"{historia['caption'].strip()}\n📚 Caso real. Fuentes: {', '.join(fuentes[:5])}"
     episodio = {
         "fecha": hoy.isoformat(),
         "tipo": clave,
         "titulo": historia["titulo"],
-        "fuente": {"titulo": articulo["titulo"], "url": articulo["url"]},
+        "fuente": {"titulo": articulo["titulo"], "url": articulo["url"], "fuentes": fuentes},
+        "titulo_facebook": historia["titulo_facebook"],
+        "portada": historia["portada"],
+        "portada_imagen": historia["portada_imagen"],
         "escenario": historia["escenario"],
         "escenas": historia["escenas"],
         "caption": ordenar_hashtags(caption),

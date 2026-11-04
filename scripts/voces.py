@@ -33,11 +33,11 @@ VOZ_GEMINI = env("VOZ_GEMINI", "Algenib")  # masculina, grave y con textura
 ESCENAS_POR_TROZO = int(env("ESCENAS_POR_TROZO", "10"))  # ~1,5 min por pedido: 4-5 pedidos por historia
 # Indicación corta, en el formato que recomienda Google para sus voces ("Di de tal forma: texto")
 ESTILO = (
-    "Narra de forma serena y sobria, como un documental: voz grave y natural, "
-    "con un poco menos de emoción de lo normal y sin dramatizar"
+    "Narra con intriga, como un narrador de misterio que atrapa: voz grave y cercana, "
+    "bajando la voz en lo inquietante y con energía en las revelaciones, sin exagerar"
 )
 # Palabras de la indicación que NO deben oírse en el audio
-RASTROS = ("serena y sobria", "documental", "menos de emoción", "dramatizar", "voz grave", "instrucci")
+RASTROS = ("narra con intriga", "narrador de misterio que atrapa", "grave y cercana", "bajando la voz", "sin exagerar", "instrucci")
 
 
 class SinVozGemini(Exception):

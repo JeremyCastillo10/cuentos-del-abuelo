@@ -15,6 +15,8 @@ export type Escena = {
   imagen?: string;
   // Foto real elegida por scripts/imagenes.py (Pexels o Pixabay)
   foto?: { archivo: string; autor: string; fuente: string };
+  // Video de archivo (tiene prioridad sobre la foto); "segundos" es lo que dura el clip preparado
+  video?: { archivo: string; autor: string; fuente: string; segundos: number };
   // Ruta dentro de public/, la escribe scripts/voces.py. Con Gemini, un audio cubre un trozo
   // de varias escenas: solo la primera del trozo lleva "audio", y todas llevan "grupo" y "palabras".
   audio?: string;
@@ -39,6 +41,10 @@ export type Episodio = {
   titulo: string;
   escenas: Escena[];
   caption: string;
+  titulo_facebook?: string;
+  // Miniatura: frase grande y foto
+  portada?: string;
+  portada_foto?: string;
 };
 
 export type HistoriaProps = {
@@ -50,7 +56,9 @@ export type HistoriaProps = {
 export const NOMBRE = "CUENTOS DEL ABUELO";
 export const CUENTA = "@cuentos_delabuelo";
 export const FPS = 24; // suficiente para movimientos lentos y 20 % más rápido de renderizar
-export const INTRO = 48; // tarjeta de título (2 s)
+// La narración empieza casi de inmediato: los primeros 3 segundos deciden si la gente se queda.
+// El título se muestra encima de la primera escena.
+export const INTRO = 6;
 export const OUTRO = 72; // "Síguenos" (3 s)
 export const PAUSA = 6; // respiro entre frases
 

@@ -27,14 +27,14 @@ def llamar(url: str, datos: dict | None = None) -> dict:
         raise SystemExit(f"Error de Instagram {e.code}: {cuerpo}") from e
 
 
-def subir_a_release(ruta, repo: str) -> tuple[str, str]:
-    """Sube el MP4 a una release temporal y devuelve (tag, URL pública del archivo)."""
+def subir_a_release(rutas: list, repo: str) -> tuple[str, list[str]]:
+    """Sube los archivos a una release temporal y devuelve (tag, URLs públicas)."""
     tag = "reel-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     subprocess.run(
-        ["gh", "release", "create", tag, str(ruta), "--repo", repo, "--title", tag, "--notes", "Reel temporal para Instagram"],
+        ["gh", "release", "create", tag, *map(str, rutas), "--repo", repo, "--title", tag, "--notes", "Reel temporal para Instagram"],
         check=True,
     )
-    return tag, f"https://github.com/{repo}/releases/download/{tag}/{ruta.name}"
+    return tag, [f"https://github.com/{repo}/releases/download/{tag}/{r.name}" for r in rutas]
 
 
 def borrar_release(tag: str, repo: str) -> None:
@@ -49,13 +49,15 @@ def main() -> None:
     ruta = RAIZ / "out" / "episodio.mp4"
     caption = json.loads(EPISODIO.read_text(encoding="utf-8")).get("caption", "")
 
-    tag, url = subir_a_release(ruta, repo)
+    portada = RAIZ / "out" / "portada.jpg"
+    rutas = [ruta] + ([portada] if portada.exists() else [])
+    tag, urls = subir_a_release(rutas, repo)
     try:
-        # 1. Crear el contenedor del Reel apuntando al video público
-        contenedor = llamar(
-            f"{API}/{usuario}/media",
-            {"media_type": "REELS", "video_url": url, "caption": caption, "access_token": token},
-        )["id"]
+        # 1. Crear el contenedor del Reel apuntando al video público (y a la miniatura, si hay)
+        datos = {"media_type": "REELS", "video_url": urls[0], "caption": caption, "access_token": token}
+        if len(urls) > 1:
+            datos["cover_url"] = urls[1]
+        contenedor = llamar(f"{API}/{usuario}/media", datos)["id"]
 
         # 2. Esperar a que Instagram descargue y procese el video
         for _ in range(40):

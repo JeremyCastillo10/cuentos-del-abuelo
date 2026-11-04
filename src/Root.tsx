@@ -1,7 +1,8 @@
 import React from "react";
-import { Composition, staticFile, type CalculateMetadataFunction } from "remotion";
+import { Composition, Still, staticFile, type CalculateMetadataFunction } from "remotion";
 import { getAudioData } from "@remotion/media-utils";
 import { Historia } from "./Historia";
+import { Portada } from "./Portada";
 import { FPS, INTRO, OUTRO, PAUSA, type Episodio, type HistoriaProps } from "./tipos";
 
 const calcularMetadata: CalculateMetadataFunction<HistoriaProps> = async ({ props }) => {
@@ -39,7 +40,20 @@ const calcularMetadata: CalculateMetadataFunction<HistoriaProps> = async ({ prop
   };
 };
 
+const metadataPortada: CalculateMetadataFunction<{ episodio: Episodio | null }> = async ({ props }) => ({
+  props: { episodio: props.episodio ?? (await fetch(staticFile("episodio.json")).then((r) => r.json())) },
+});
+
 export const RemotionRoot: React.FC = () => (
+  <>
+  <Still
+    id="Portada"
+    component={Portada}
+    width={1080}
+    height={1920}
+    defaultProps={{ episodio: null }}
+    calculateMetadata={metadataPortada}
+  />
   <Composition
     id="Historia"
     component={Historia}
@@ -50,4 +64,5 @@ export const RemotionRoot: React.FC = () => (
     defaultProps={{ episodio: null, duraciones: [] }}
     calculateMetadata={calcularMetadata}
   />
+  </>
 );

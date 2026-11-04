@@ -91,11 +91,14 @@ jobs:
         run: python scripts/imagenes.py
       - name: Render
         run: npx remotion render Historia out/episodio.mp4 --concurrency=100% --crf=26
+      - name: Portada
+        run: npx remotion still Portada out/portada.jpg --image-format=jpeg --jpeg-quality=90 || echo "Sin portada"
       - uses: actions/upload-artifact@v4
         with:
           name: historia
           path: |
             out/episodio.mp4
+            out/portada.jpg
             public/episodio.json
           retention-days: 14
       - id: ig
