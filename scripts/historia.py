@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 import urllib.error
 from datetime import date
 
@@ -51,7 +52,8 @@ Reglas:
 4. Dura entre 5 y 8 minutos narrada: entre {min_palabras} y {max_palabras} palabras en total. Usa ese
    espacio para desarrollar bien la historia con los datos del artículo: contexto, lugar, época,
    personas implicadas, pistas, giros y desenlace.
-5. Divide el texto en escenas: cada escena es una o dos frases (máx 30 palabras), fáciles de narrar.
+5. Divide el texto en ENTRE 35 Y 50 ESCENAS. Cada escena es una o dos frases de 18 a 28 palabras, fáciles
+   de narrar. Menos de 35 escenas es demasiado corto: sigue contando con más hechos del artículo.
 6. La PRIMERA escena es el gancho: un hecho real que obligue a seguir viendo (nada de saludos ni
    "hoy les traigo").
 7. Nada de violencia gráfica, gore ni contenido sexual. Apto para mayores de 13 años.
@@ -70,7 +72,7 @@ Reglas:
      #leyendas #historiasreales).
 
 Responde SOLO con JSON:
-{{"apto": true, "titulo": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "..."}}], "caption": "..."}}"""
+{{"apto": true, "titulo": "...", "escenas": [{{"texto": "...", "ambiente": "...", "imagen": "..."}}, ... (35 a 50 escenas)], "caption": "..."}}"""
 
 ETIQUETAS = {
     "leyenda": "🌙 Leyenda popular real: cuenta lo que dice la tradición, no un hecho comprobado.",
@@ -79,7 +81,7 @@ ETIQUETAS = {
 }
 
 
-def groq_texto(sistema: str, usuario: str) -> str:
+def groq_texto(sistema: str, usuario: str, esperas: int = 0) -> str:
     """Respaldo con Groq: prueba varios modelos y devuelve el JSON como texto."""
     errores = []
     for modelo in env("GROQ_MODELOS", ",".join(MODELOS_GROQ)).split(","):
@@ -106,6 +108,12 @@ def groq_texto(sistema: str, usuario: str) -> str:
                 detalle = e.read().decode(errors="ignore")[:300]
                 errores.append(f"{modelo} {e.code}: {detalle}")
                 print(f"Groq {modelo} respondió {e.code}: {detalle}")
+                if e.code == 429 and esperas < 2:
+                    # Límite de tokens por minuto: esperar y reintentar el mismo modelo
+                    esperas += 1
+                    print("  esperando 65 s por el límite por minuto de Groq")
+                    time.sleep(65)
+                    return groq_texto(sistema, usuario, esperas)
                 if e.code != 400:
                     break
             except (ValueError, KeyError) as e:

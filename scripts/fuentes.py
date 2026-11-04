@@ -73,6 +73,8 @@ SEMILLAS = {
 }
 
 MIN_CARACTERES = 6000  # artículos cortos no dan para 5 minutos sin inventar
+# Lo que se le pasa al modelo: da para 8 minutos y cabe en el límite por minuto de Groq
+LIMITE_TEXTO = 14000
 
 
 def _buscar_titulos(consulta: str) -> list[dict]:
@@ -96,7 +98,7 @@ def _articulo(titulo: str) -> dict | None:
         return None
     return {
         "titulo": titulo,
-        "texto": texto[:30000],
+        "texto": texto[:LIMITE_TEXTO],
         "url": "https://es.wikipedia.org/wiki/" + urllib.parse.quote(titulo.replace(" ", "_")),
     }
 
@@ -134,7 +136,7 @@ def elegir_articulo(tipo: str, usados: set[str], descartados: set[str]) -> dict:
             if len(texto) >= MIN_CARACTERES:
                 return {
                     "titulo": r["title"],
-                    "texto": texto[:30000],
+                    "texto": texto[:LIMITE_TEXTO],
                     "url": "https://es.wikipedia.org/wiki/" + urllib.parse.quote(r["title"].replace(" ", "_")),
                 }
     raise SystemExit(f"No se encontró en Wikipedia un artículo nuevo y largo para el tipo '{tipo}'")
