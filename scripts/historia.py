@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import time
 import urllib.error
 from datetime import date
@@ -84,7 +85,7 @@ Reglas para ATRAPAR (lo más importante después de la verdad):
    (sirve para buscar fotos y videos de archivo): objeto o lugar físico + (opcional) hora, clima o acción.
    Ejemplos: "sailing ship storm", "old wooden door opening", "police car night", "foggy forest walking",
    "candle flame dark", "rain window night". PROHIBIDO lo abstracto (mystery, fear, crime, death, ghost,
-   history) y los nombres propios. Escenas seguidas en el mismo sitio repiten la misma búsqueda.
+   history), los nombres propios y los niños (nunca "child", "kid", "girl", "boy"). Escenas seguidas en el mismo sitio repiten la misma búsqueda.
    Y lleva "momento": "calma" (contexto), "tension" (algo inquietante se acerca) o "giro" (el dato fuerte,
    la revelación). La primera escena es "giro". Más o menos 1 de cada 5 es "giro"; las 1 o 2 anteriores
    a un giro, "tension". En las escenas "giro" (y solo en esas) añade "pantalla": 1 a 4 palabras EN
@@ -211,6 +212,18 @@ def marcar_momentos(escenas: list[dict], originales: list[dict]) -> None:
             e.pop("pantalla", None)
 
 
+NINOS = re.compile(r"\bniñ[oa]s?\b|\bmenores?\b|\bbeb[ée]s?\b|\binfant(?:es|il)\b|\bhijos pequeños\b|\bcriaturas\b", re.I)
+
+
+def victimas_menores(historia: dict, tipo: str) -> bool:
+    """En crímenes y desapariciones, rechaza las historias que hablan de niños (posibles víctimas menores)."""
+    if tipo not in ("crimen", "misterio"):
+        return False
+    texto = " ".join(e["texto"] for e in historia["escenas"])
+    menciones = NINOS.findall(texto)
+    return len(menciones) >= 2
+
+
 def validar(historia: dict) -> dict:
     escenas = [
         {
@@ -264,6 +277,9 @@ def main() -> None:
                 print(f"  No sirve: {respuesta.get('motivo', '')}")
                 break
             candidata = validar(respuesta)
+            if victimas_menores(candidata, clave):
+                print("  No sirve: la historia habla de niños (posibles víctimas menores)")
+                break
             n = sum(len(e["texto"].split()) for e in candidata["escenas"])
             print(f"  Intento {intento + 1}: {n} palabras")
             if n > palabras:
@@ -276,7 +292,7 @@ def main() -> None:
                 "Escríbela completa otra vez usando MÁS hechos del artículo (contexto, época, lugar, personas, "
                 "investigación, consecuencias) y con el gancho y los bucles de las reglas. No inventes nada."
             )
-        if mejor and palabras >= minimo * 0.75:
+        if mejor and palabras >= minimo * 0.85:
             historia = mejor
             break
         descartados.add(articulo["titulo"])

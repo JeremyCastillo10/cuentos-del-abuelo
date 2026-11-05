@@ -75,7 +75,7 @@ jobs:
       - run: npm ci
       - name: Voz (edge-tts) y ffmpeg
         run: |
-          pip install edge-tts pillow
+          pip install edge-tts pillow trafilatura
           sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: Dependencias de Chrome para Remotion
         run: npx remotion browser ensure

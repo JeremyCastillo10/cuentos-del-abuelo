@@ -29,7 +29,8 @@ def pexels(consulta: str) -> list[dict]:
     q = urllib.parse.urlencode({"query": consulta, "orientation": "portrait", "size": "large", "per_page": 20})
     datos = http(f"https://api.pexels.com/v1/search?{q}", headers={"Authorization": clave} | UA)
     return [
-        {"url": f["src"]["large2x"], "autor": f["photographer"], "fuente": "Pexels", "id": f"pexels-{f['id']}"}
+        {"url": f["src"]["large2x"], "autor": f["photographer"], "fuente": "Pexels", "id": f"pexels-{f['id']}",
+         "etiquetas": f.get("alt") or ""}
         for f in datos.get("photos", [])
     ]
 
@@ -93,8 +94,10 @@ def pexels_videos(consulta: str) -> list[dict]:
 
 def buscar_video(consulta: str, usadas: set[str]) -> dict | None:
     """Video de archivo que encaje con la escena: más exigente que con las fotos."""
-    palabras = [p for p in consulta.split() if len(p) > 2]
-    minimo = max(1, (len(palabras) + 1) // 2)
+    palabras = clave(consulta)
+    if not palabras:
+        return None
+    minimo = len(palabras) if len(palabras) <= 2 else len(palabras) - 1
     candidatos = []
     for fuente in (pixabay_videos, pexels_videos):
         try:
@@ -137,10 +140,35 @@ def preparar_video(url: str, ruta) -> float:
     return float(salida.strip())
 
 
+# Palabras que casi cualquier video tiene: no sirven para saber si encaja con la escena
+GENERICAS = {
+    "night", "old", "dark", "dim", "closed", "interior", "view", "light", "ancient", "vintage", "small", "big",
+    "empty", "scene", "the", "with", "and", "for", "from", "inside", "outside", "close", "shot", "background",
+    "black", "white", "gray", "grey", "time", "lapse", "evening", "day", "dramatic", "mysterious", "creepy",
+}
+# Nunca niños en los videos ni en las fotos
+PROHIBIDAS = {"child", "children", "kid", "kids", "baby", "toddler", "boy", "girl", "childhood", "infant", "teen"}
+
+
+def _fichas(etiquetas: str) -> set[str]:
+    return {w for w in etiquetas.lower().replace(",", " ").replace("-", " ").split() if w}
+
+
+def clave(consulta: str) -> list[str]:
+    """Las palabras que importan de la búsqueda (el objeto o lugar, no el adjetivo ni la hora)."""
+    return [p for p in consulta.lower().split() if len(p) > 2 and p not in GENERICAS]
+
+
+def coincide(p: str, fichas: set[str]) -> bool:
+    return p in fichas or p + "s" in fichas or p.rstrip("s") in fichas or p + "es" in fichas
+
+
 def puntaje(candidata: dict, consulta: str) -> int:
-    """Cuántas palabras de la búsqueda aparecen en las etiquetas de la foto."""
-    etiquetas = candidata.get("etiquetas", "").lower()
-    return sum(1 for p in consulta.lower().split() if len(p) > 2 and p in etiquetas)
+    """Cuántas palabras importantes de la búsqueda aparecen como etiqueta (palabra entera)."""
+    fichas = _fichas(candidata.get("etiquetas", ""))
+    if fichas & PROHIBIDAS:
+        return -1
+    return sum(1 for p in clave(consulta) if coincide(p, fichas))
 
 
 def buscar(consulta: str, usadas: set[str], respaldo: str = "") -> dict | None:
@@ -156,7 +184,7 @@ def buscar(consulta: str, usadas: set[str], respaldo: str = "") -> dict | None:
                 continue
             mejor = max(candidatas, key=lambda c: puntaje(c, q))
             # Pixabay da etiquetas: exigir al menos la mitad de las palabras; Pexels no las da
-            minimo = max(1, len([p for p in q.split() if len(p) > 2]) // 2) if "etiquetas" in mejor else 0
+            minimo = max(1, (len(clave(q)) + 1) // 2) if "etiquetas" in mejor else 0
             if puntaje(mejor, q) >= minimo:
                 return mejor
     return None

@@ -50,18 +50,19 @@ BUSQUEDAS = {
     ],
 }
 
-# Casos, misterios y leyendas reales muy conocidos (títulos de Wikipedia en español; las
+# Casos, misterios y leyendas reales muy conocidos. En "crimen" NO van casos con víctimas menores de edad
+# (va contra las normas de la página y Facebook los castiga). (títulos de Wikipedia en español; las
 # redirecciones también valen). Se prueban primero, sin repetir; la búsqueda es el último recurso.
 SEMILLAS = {
     "crimen": [
-        "Jack el Destripador", "H. H. Holmes", "Ed Gein", "Ted Bundy", "Asesino del Zodiaco",
-        "Elizabeth Short", "Albert Fish", "Gregorio Cárdenas", "Las Poquianchis", "Lizzie Borden",
-        "Bonnie y Clyde", "Al Capone", "Charles Manson", "Jeffrey Dahmer", "John Wayne Gacy",
-        "Richard Ramírez", "Aileen Wuornos", "Harold Shipman", "Peter Sutcliffe", "Henri Désiré Landru",
-        "Marcel Petiot", "Enriqueta Martí", "Manuel Blanco Romasanta", "Gilles de Rais", "Isabel Báthory",
-        "Asesinatos de la granja de Hinterkaifeck", "Juana Barraza", "Robo del tren de Glasgow-Londres",
-        "Robo de la Mona Lisa", "D. B. Cooper", "Asesinato de Lindbergh", "Caso Dominici",
-        "Andrés Ortega", "Pedro Alonso López", "Daniel Camargo Barbosa", "Juan Vallejo Corona",
+        "Jack el Destripador", "Ed Gein",
+        "Elizabeth Short", "Lizzie Borden",
+        "Bonnie y Clyde", "Al Capone", "Charles Manson",
+        "Aileen Wuornos", "Harold Shipman", "Henri Désiré Landru",
+                "Juana Barraza", "Robo del tren de Glasgow-Londres",
+        "Robo de la Mona Lisa", "D. B. Cooper", "Asesinato de Rasputín",
+        "Robo del Banco Central de Fortaleza", "Masacre del día de San Valentín", "Asesinato de Julio César",
+        "Juan Vallejo Corona",
     ],
     "misterio": [
         "Mary Celeste", "Incidente del paso Diatlov", "Colonia de Roanoke", "Triángulo de las Bermudas",
@@ -171,13 +172,96 @@ def investigar(tema: str, tipo: str) -> dict | None:
     return None
 
 
+# ---------- Búsqueda web directa (sin cupo de IA) ----------
+EXCLUIR = ("wikipedia.", "wikiwand.", "youtube.", "facebook.", "instagram.", "tiktok.", "pinterest.", "twitter.",
+           "x.com", "amazon.", "reddit.", "quora.", "spotify.", "apple.com", "duckduckgo.", "bing.", "microsoft.")
+NAVEGADOR = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+    "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+}
+
+
+def _html(url: str) -> str:
+    import urllib.request
+
+    req = urllib.request.Request(url, headers=NAVEGADOR)
+    with urllib.request.urlopen(req, timeout=25) as r:
+        return r.read().decode("utf-8", errors="ignore")
+
+
+def _resultados(consulta: str) -> list[str]:
+    """Enlaces de resultados de búsqueda (DuckDuckGo y, si falla, Bing)."""
+    import html as htmllib
+    import re
+
+    enlaces: list[str] = []
+    try:
+        pagina = _html("https://html.duckduckgo.com/html/?" + urllib.parse.urlencode({"q": consulta, "kl": "es-es"}))
+        for href in re.findall(r'class="result__a"[^>]*href="([^"]+)"', pagina):
+            href = htmllib.unescape(href)
+            if "uddg=" in href:
+                href = urllib.parse.unquote(urllib.parse.parse_qs(urllib.parse.urlparse(href).query).get("uddg", [""])[0])
+            enlaces.append(href)
+    except Exception as e:
+        print(f"  DuckDuckGo falló: {e}")
+    if len(enlaces) < 3:
+        try:
+            pagina = _html("https://www.bing.com/search?" + urllib.parse.urlencode({"q": consulta, "setlang": "es"}))
+            enlaces += [htmllib.unescape(h) for h in re.findall(r'<li class="b_algo".*?<a[^>]+href="(https?://[^"]+)"', pagina, re.S)]
+        except Exception as e:
+            print(f"  Bing falló: {e}")
+    vistos, limpios = set(), []
+    for e in enlaces:
+        dominio = urllib.parse.urlparse(e).netloc.lower().removeprefix("www.")
+        if e.startswith("http") and dominio and dominio not in vistos and not any(x in dominio for x in EXCLUIR):
+            vistos.add(dominio)
+            limpios.append(e)
+    return limpios
+
+
+def buscar_web(tema: str, tipo: str) -> dict | None:
+    """Lee varias páginas sobre el caso (prensa, sitios de historia y misterio) y junta sus textos."""
+    try:
+        import trafilatura
+    except ImportError:
+        print("  Falta trafilatura: sin búsqueda web directa")
+        return None
+    consultas = [f"{tema} caso historia real", f"{tema} history case"]
+    textos, fuentes = [], []
+    for consulta in consultas:
+        for url in _resultados(consulta)[:8]:
+            if len(fuentes) >= 4:
+                break
+            dominio = urllib.parse.urlparse(url).netloc.lower().removeprefix("www.")
+            if dominio in fuentes:
+                continue
+            try:
+                texto = trafilatura.extract(_html(url), include_comments=False, include_tables=False) or ""
+            except Exception as e:
+                print(f"  No se pudo leer {dominio}: {e}")
+                continue
+            # Solo páginas que de verdad hablan del caso
+            palabra = max(tema.split(), key=len).lower()
+            if len(texto) < 1500 or palabra not in texto.lower():
+                continue
+            textos.append(f"FUENTE: {dominio}\n{texto[:4500]}")
+            fuentes.append(dominio)
+        if len(fuentes) >= 3:
+            break
+    if len(fuentes) < 2 or sum(len(t) for t in textos) < 4500:
+        print(f"  Web: pocas fuentes útiles para '{tema}' ({fuentes})")
+        return None
+    print(f"  Web: {len(fuentes)} fuentes: {', '.join(fuentes)}")
+    return {"titulo": tema, "texto": "\n\n".join(textos)[:LIMITE_TEXTO], "url": "", "fuentes": fuentes}
+
+
 def elegir_caso(tipo: str, usados: set[str], descartados: set[str]) -> dict:
-    """Primero un caso conocido investigado en la web; si no se puede, un artículo de Wikipedia."""
+    """Un caso conocido investigado en varias fuentes de la web; si no se puede, un artículo de Wikipedia."""
     semillas = [t for t in SEMILLAS[tipo] if t not in usados and t not in descartados]
     random.shuffle(semillas)
-    for tema in semillas[:2]:
+    for tema in semillas[:3]:
         print(f"Investigando en la web: {tema}")
-        caso = investigar(tema, tipo)
+        caso = buscar_web(tema, tipo) or investigar(tema, tipo)
         if caso:
             return caso
         descartados.add(tema)
