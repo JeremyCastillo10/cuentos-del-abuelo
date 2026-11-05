@@ -99,8 +99,11 @@ Reglas para ATRAPAR (lo más importante después de la verdad):
 11. Final: cierra con el dato más inquietante que queda, y en la última escena pide la opinión:
    "¿Tú qué crees que pasó? Te leo en los comentarios." Sin despedidas largas.
 12. Cada escena lleva "ambiente": uno de {ambientes}.
-   Y lleva "imagen": búsqueda EN INGLÉS de 2 a 4 palabras CONCRETAS de lo que se VE en esa escena
-   (sirve para buscar fotos y videos de archivo): objeto o lugar físico + (opcional) hora, clima o acción.
+   Y lleva "imagen": búsqueda EN INGLÉS de 2 a 3 palabras CONCRETAS de lo que se VE en esa escena, que se
+   pueda encontrar en un banco gratis de fotos y videos (Pixabay): cosas comunes como "desert pyramid",
+   "old book pages", "candle flame", "storm sea", "soldiers marching", "police car night", "ancient ruins".
+   NUNCA nombres de personas, títulos de libros o documentos, años, ni cosas que no se fotografían
+   ("lepere book cover", "james morgan interview", "1798 map" están MAL).
    Ejemplos: "sailing ship storm", "old wooden door opening", "police car night", "foggy forest walking",
    "candle flame dark", "rain window night". PROHIBIDO lo abstracto (mystery, fear, crime, death, ghost,
    history), los nombres propios y los niños (nunca "child", "kid", "girl", "boy"). Escenas seguidas en el mismo sitio repiten la misma búsqueda.

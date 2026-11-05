@@ -173,7 +173,13 @@ def puntaje(candidata: dict, consulta: str) -> int:
 
 def buscar(consulta: str, usadas: set[str], respaldo: str = "") -> dict | None:
     """La foto cuyas etiquetas más coinciden con la búsqueda; si ninguna coincide, el escenario de la historia."""
-    for q in [consulta] + ([respaldo] if respaldo and respaldo != consulta else []):
+    # Si la búsqueda exacta no da nada: cada palabra importante por separado (la más larga primero),
+    # luego el lugar principal de la historia y sus palabras
+    consultas = [consulta] + sorted(clave(consulta), key=len, reverse=True)
+    if respaldo:
+        consultas += [respaldo] + sorted(clave(respaldo), key=len, reverse=True)
+    vistas = set()
+    for q in [c for c in consultas if not (c in vistas or vistas.add(c))]:
         for fuente in (pixabay, pexels):
             try:
                 candidatas = [c for c in fuente(q) if c["id"] not in usadas]
