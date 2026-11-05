@@ -39,6 +39,17 @@ BUSQUEDAS = {
         "aparición fantasma caso famoso",
         "fenómeno paranormal caso investigado",
     ],
+    "enigma": [
+        "enigma arqueológico sin resolver",
+        "misterio de la construcción antigua",
+        "civilización perdida misterio",
+        "objeto arqueológico misterioso",
+    ],
+    "ovni": [
+        "avistamiento ovni caso famoso",
+        "incidente ovni investigación militar",
+        "encuentro cercano ovni testigos",
+    ],
     "leyenda": [
         "leyenda dominicana",
         "leyenda urbana latinoamericana",
@@ -78,6 +89,22 @@ SEMILLAS = {
         "Bruja de Bell", "Annabelle (muñeca)", "Robert (muñeco)", "Isla de las Muñecas", "Palacio de Linares",
         "Caso Amityville", "Hotel Cecil", "Castillo de Chillingham", "Torre de Londres", "Hospital Waverly Hills",
         "Casa de los Espíritus", "Castillo de Edimburgo", "Mansión Myrtles", "Penitenciaría Estatal del Este",
+    ],
+    "enigma": [
+        "Gran Pirámide de Guiza", "Esfinge de Guiza", "Stonehenge", "Líneas de Nazca", "Atlántida",
+        "Mecanismo de Anticitera", "Moái", "Puma Punku", "Sacsayhuamán", "Göbekli Tepe", "Tumba de Tutankamón",
+        "Teotihuacán", "Machu Picchu", "Cabezas colosales olmecas", "Calendario maya", "Piedras de Ica",
+        "Esferas de piedra de Costa Rica", "Baalbek", "Tumba de Qin Shi Huang", "Biblioteca de Alejandría",
+        "Ciudad perdida de Z", "Nan Madol", "Derinkuyu", "Pilar de hierro de Delhi", "Cráneos de cristal",
+        "Ruinas de Tiahuanaco", "Templo de Kailasa", "Mohenjo-Daro",
+    ],
+    "ovni": [
+        "Incidente ovni de Roswell", "Caso Varginha", "Luces de Phoenix", "Incidente de Rendlesham",
+        "Caso Betty y Barney Hill", "Incidente del USS Nimitz", "Incidente de Manises", "Batalla de Los Ángeles",
+        "Caso Travis Walton", "Incidente ovni de Westall", "Incidente de Kecksburg", "Ola ovni belga",
+        "Incidente de Socorro", "Caso Kenneth Arnold", "Incidente de Shag Harbour", "Incidente de Colares",
+        "Proyecto Libro Azul", "Área 51", "Incidente de la escuela Ariel", "Encuentro de Flatwoods",
+        "Incidente ovni de Teherán de 1976", "Avistamiento de Washington de 1952",
     ],
     "leyenda": [
         "Ciguapa", "Bacá", "Galipote", "La Llorona", "El Silbón", "La Sayona", "Chupacabras",

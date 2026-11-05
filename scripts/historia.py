@@ -35,8 +35,24 @@ TIPOS = [
         "que no está comprobado y qué explicaciones se han dado.",
     ),
 ]
-# Orden de la semana: más casos sin resolver, asesinatos y apariciones; una leyenda de vez en cuando
-ROTACION = ["misterio", "crimen", "paranormal", "misterio", "crimen", "paranormal", "leyenda"]
+# Orden de los días: variedad de misterios (no solo terror). Se repite cada 10 días.
+ROTACION = ["misterio", "enigma", "crimen", "ovni", "paranormal", "enigma", "misterio", "ovni", "crimen", "leyenda"]
+TIPOS.append(
+    (
+        "enigma",
+        "Es un ENIGMA REAL de la historia o la arqueología (cómo se construyó algo, una civilización perdida, un "
+        "objeto o lugar inexplicable). Cuenta lo que se sabe de verdad, los datos asombrosos y las teorías de los "
+        "expertos, separando bien lo comprobado de las especulaciones. Que dé asombro y curiosidad.",
+    )
+)
+TIPOS.append(
+    (
+        "ovni",
+        "Es un caso OVNI REAL muy conocido (avistamiento o encuentro reportado y documentado). Cuenta lo que dijeron "
+        "los testigos, lo que investigaron las autoridades o los expertos y las explicaciones que se han dado, "
+        "dejando claro qué está comprobado y qué no. Sin afirmar que fueron extraterrestres.",
+    )
+)
 TIPOS.append(
     (
         "leyenda",
@@ -46,7 +62,7 @@ TIPOS.append(
 )
 
 INSTRUCCIONES = """Eres el guionista y narrador de "Cuentos del Abuelo", una página de Facebook e Instagram de
-historias REALES de misterio, crímenes y apariciones para público latino. Tu trabajo es que la gente NO PUEDA
+historias REALES de misterio, crímenes, apariciones, enigmas de la historia y casos ovni para público latino. Tu trabajo es que la gente NO PUEDA
 DEJAR DE VER: cada segundo que alguien sigue mirando es lo que hace crecer la página.
 
 Te paso la información de un caso real. Cuéntalo como un gran narrador de misterio de YouTube: cercano,
@@ -62,8 +78,10 @@ Reglas de VERDAD (nunca se rompen):
 4. Nada de violencia gráfica, gore ni contenido sexual. Apto para mayores de 13 años.
 
 Reglas para ATRAPAR (lo más importante después de la verdad):
-5. Duración: entre {min_palabras} y {max_palabras} palabras en total, en ENTRE 35 Y 50 ESCENAS de una o dos
-   frases (18 a 28 palabras cada una). Desarrolla bien: contexto, personas, pistas, giros, desenlace.
+5. Duración: entre {min_palabras} y {max_palabras} palabras en total (mínimo 5 minutos narrados), en ENTRE 40 Y
+   50 ESCENAS de una o dos frases (18 a 28 palabras cada una). NO RESUMAS NI DES SALTOS: cuenta los hechos en
+   orden, paso a paso; cada escena avanza UN solo paso de la historia. Si la información trae detalles
+   (fechas, lugares, qué dijo cada testigo, qué se encontró), úsalos todos antes de pasar a lo siguiente.
 6. Los primeros 3 segundos deciden todo. La PRIMERA escena es un gancho brutal: el dato más impactante,
    extraño o perturbador del caso, dicho de golpe, o una pregunta que nadie puede ignorar. Ejemplos de forma
    (no de contenido): "En 1872 encontraron un barco navegando solo... y la comida todavía estaba caliente."
@@ -115,6 +133,8 @@ ETIQUETAS = {
     "misterio": "🔎 Caso real sin resolver, contado con lo que se sabe.",
     "crimen": "⚖️ Caso real, contado con información pública.",
     "paranormal": "👻 Caso paranormal reportado: cuenta lo que dijeron los testigos, no está comprobado.",
+    "enigma": "🏛️ Enigma real de la historia: lo que se sabe y lo que todavía no tiene respuesta.",
+    "ovni": "🛸 Caso ovni reportado y documentado: lo que dijeron los testigos y lo que se investigó.",
 }
 
 
@@ -183,6 +203,44 @@ def escribir(sistema: str, usuario: str) -> str:
         print("Gemini no respondió; escribiendo la historia con Groq")
         return groq_texto(sistema, usuario)
     raise SystemExit("Ningún modelo de texto respondió (Gemini ni Groq)")
+
+
+class NoApto(Exception):
+    """El caso no sirve según las reglas (reciente, víctimas menores, poca información...)."""
+
+
+PARTE1 = """EN ESTA RESPUESTA ESCRIBE SOLO LA PRIMERA MITAD DE LA HISTORIA: de 20 a 25 escenas, entre {min} y {max}
+palabras en total. Incluye el gancho, la promesa, el contexto (época, lugar, personas) y el desarrollo de los
+hechos EN ORDEN y con detalle hasta más o menos la mitad del caso, y termina esta mitad en un momento de
+suspenso. NO cuentes todavía el desenlace. Incluye también titulo, titulo_facebook, portada, portada_imagen,
+escenario y caption con el formato de las reglas. {aviso}"""
+
+PARTE2 = """La PRIMERA MITAD de la historia ya está narrada (abajo). ESCRIBE SOLO LA SEGUNDA MITAD: de 20 a 25
+escenas nuevas, entre {min} y {max} palabras, que continúen JUSTO donde terminó la primera, sin repetir nada.
+Cuenta el resto de los hechos EN ORDEN y con detalle (investigación, pistas, teorías, giros, cómo terminó, qué
+sigue sin respuesta), incluye la frase de retención de la regla 10 al principio de esta mitad y termina con la
+pregunta final de la regla 11. Cada escena con texto, ambiente, imagen y momento (y pantalla en los giros).
+Responde SOLO con JSON: {{"escenas": [...]}} {aviso}
+
+PRIMERA MITAD (no la repitas):
+{primera}"""
+
+
+def escribir_en_dos_partes(sistema: str, usuario: str, minimo: int, maximo: int, aviso: str = "") -> dict:
+    """La historia en dos mitades: cada respuesta es más corta (cabe en los límites gratis) y más detallada."""
+    mitad = {"min": minimo // 2, "max": maximo // 2, "aviso": aviso}
+    # Las instrucciones van antes de la información: si hay que recortar para Groq, se recorta la información
+    r1 = json.loads(escribir(sistema, PARTE1.format(**mitad) + "\n\n" + usuario))
+    if r1.get("apto") is False:
+        raise NoApto(r1.get("motivo", ""))
+    escenas1 = [e for e in r1.get("escenas", []) if e.get("texto", "").strip()]
+    primera = "\n".join(e["texto"].strip() for e in escenas1)
+    print(f"  Primera mitad: {len(primera.split())} palabras, {len(escenas1)} escenas")
+    r2 = json.loads(escribir(sistema, PARTE2.format(**mitad, primera=primera) + "\n\n" + usuario))
+    escenas2 = [e for e in r2.get("escenas", []) if e.get("texto", "").strip()]
+    print(f"  Segunda mitad: {sum(len(e['texto'].split()) for e in escenas2)} palabras, {len(escenas2)} escenas")
+    r1["escenas"] = escenas1 + escenas2
+    return validar(r1)
 
 
 def cargar_publicadas() -> list[str]:
@@ -259,10 +317,11 @@ def main() -> None:
         ambientes=", ".join(AMBIENTES),
         etiqueta=ETIQUETAS[clave],
         # Narrando a unas 145 palabras por minuto: 5 min ≈ 730 palabras, 8 min ≈ 1150
-        min_palabras=env("MIN_PALABRAS", "730"),
+        min_palabras=env("MIN_PALABRAS", "800"),
         max_palabras=env("MAX_PALABRAS", "1150"),
     )
-    minimo = int(env("MIN_PALABRAS", "730"))
+    minimo = int(env("MIN_PALABRAS", "800"))
+    maximo = int(env("MAX_PALABRAS", "1150"))
     usados = set(publicadas)
     descartados: set[str] = set()
     historia, articulo = None, None
@@ -270,27 +329,26 @@ def main() -> None:
         articulo = elegir_caso(clave, usados, descartados)
         print(f"Artículo: {articulo['titulo']} ({len(articulo['texto'])} caracteres)")
         usuario = f"INFORMACIÓN DEL CASO: «{articulo['titulo']}»\n\n{articulo['texto']}"
-        pedido, mejor, palabras = usuario, None, 0
-        for intento in range(3):
-            respuesta = json.loads(escribir(sistema, pedido))
-            if respuesta.get("apto") is False:
-                print(f"  No sirve: {respuesta.get('motivo', '')}")
+        mejor, palabras, aviso = None, 0, ""
+        for intento in range(2):
+            try:
+                candidata = escribir_en_dos_partes(sistema, usuario, minimo, maximo, aviso)
+            except NoApto as e:
+                print(f"  No sirve: {e}")
                 break
-            candidata = validar(respuesta)
             if victimas_menores(candidata, clave):
                 print("  No sirve: la historia habla de niños (posibles víctimas menores)")
                 break
             n = sum(len(e["texto"].split()) for e in candidata["escenas"])
-            print(f"  Intento {intento + 1}: {n} palabras")
+            print(f"  Intento {intento + 1}: {n} palabras, {len(candidata['escenas'])} escenas")
             if n > palabras:
                 mejor, palabras = candidata, n
-            if n >= minimo * 0.92:
+            if n >= minimo:
                 break
-            # Corta: se pide más desarrollo, pero SIEMPRE con datos del artículo
-            pedido = (
-                f"{usuario}\n\nLa versión anterior tenía solo {n} palabras y debe tener al menos {minimo}. "
-                "Escríbela completa otra vez usando MÁS hechos del artículo (contexto, época, lugar, personas, "
-                "investigación, consecuencias) y con el gancho y los bucles de las reglas. No inventes nada."
+            # Corta: se pide más desarrollo, pero SIEMPRE con datos de la información
+            aviso = (
+                f"La versión anterior quedó corta ({n} palabras en total). Esta vez CADA MITAD debe tener al menos "
+                f"{minimo // 2 + 30} palabras: cuenta más hechos de la información, paso a paso, sin resumir."
             )
         if mejor and palabras >= minimo * 0.85:
             historia = mejor

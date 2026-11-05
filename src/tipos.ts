@@ -36,7 +36,7 @@ export const momentoDe = (e: Escena, k: number): Momento =>
 
 export type Episodio = {
   fecha: string;
-  tipo: "leyenda" | "misterio" | "crimen" | "paranormal";
+  tipo: "leyenda" | "misterio" | "crimen" | "paranormal" | "enigma" | "ovni";
   fuente?: { titulo: string; url: string };
   titulo: string;
   escenas: Escena[];
