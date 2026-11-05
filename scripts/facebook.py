@@ -131,30 +131,65 @@ def publicar_reel(ruta_mp4, descripcion: str) -> str:
     return video_id
 
 
-def publicar_video(ruta_mp4, titulo: str, descripcion: str, portada=None) -> str:
-    """Video en la página (Facebook lo muestra también como Reel), con título y miniatura propia."""
-    pagina, token = env("FB_PAGE_ID"), token_pagina()
-    archivos = [("source", "historia.mp4", ruta_mp4.read_bytes(), "video/mp4")]
-    if portada and portada.exists():
-        archivos.append(("thumb", "portada.jpg", portada.read_bytes(), "image/jpeg"))
-    cuerpo, tipo = _multipart_varios(
-        {"title": titulo, "description": descripcion, "published": "true", "access_token": token}, archivos
-    )
-    for intento in range(1, 4):
+def _post_video(pagina: str, campos: dict, archivos: list | None = None, intentos: int = 4) -> dict:
+    """POST a /videos de graph-video con reintentos (cortes de red y errores pasajeros)."""
+    cuerpo, tipo = _multipart_varios(campos, archivos or [])
+    for intento in range(1, intentos + 1):
         req = urllib.request.Request(
             f"https://graph-video.facebook.com/v21.0/{pagina}/videos", data=cuerpo, headers={"Content-Type": tipo}
         )
         try:
-            with urllib.request.urlopen(req, timeout=900) as r:
-                resultado = json.loads(r.read())
-            print("Video publicado en Facebook:", resultado.get("id"))
-            return resultado["id"]
+            with urllib.request.urlopen(req, timeout=600) as r:
+                return json.loads(r.read())
         except urllib.error.HTTPError as e:
             detalle = e.read().decode(errors="ignore")[:600]
             print(f"Facebook respondió {e.code} (intento {intento}): {detalle}")
-            if intento == 3 or e.code not in (400, 500, 502, 503):
+            if intento == intentos or e.code not in (400, 500, 502, 503):
                 raise SystemExit(f"Facebook no aceptó el video: {detalle}")
-            time.sleep(60 * intento)
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            print(f"Corte de conexión con Facebook (intento {intento}): {e}")
+            if intento == intentos:
+                raise
+        time.sleep(20 * intento)
+    raise AssertionError
+
+
+def publicar_video(ruta_mp4, titulo: str, descripcion: str, portada=None) -> str:
+    """Video en la página (Facebook lo muestra también como Reel), con título y miniatura propia.
+
+    Se sube por trozos (subida reanudable): con videos de 100 MB o más, la subida de una sola vez se corta.
+    """
+    pagina, token = env("FB_PAGE_ID"), token_pagina()
+    datos = ruta_mp4.read_bytes()
+    inicio = _post_video(pagina, {"upload_phase": "start", "file_size": str(len(datos)), "access_token": token})
+    sesion, video_id = inicio["upload_session_id"], inicio["video_id"]
+    desde, hasta = int(inicio["start_offset"]), int(inicio["end_offset"])
+    while desde < hasta:
+        r = _post_video(
+            pagina,
+            {"upload_phase": "transfer", "upload_session_id": sesion, "start_offset": str(desde), "access_token": token},
+            [("video_file_chunk", "trozo.mp4", datos[desde:hasta], "application/octet-stream")],
+        )
+        desde, hasta = int(r["start_offset"]), int(r["end_offset"])
+        print(f"  subido {desde // 1048576} de {len(datos) // 1048576} MB")
+    _post_video(
+        pagina,
+        {"upload_phase": "finish", "upload_session_id": sesion, "title": titulo, "description": descripcion,
+         "published": "true", "access_token": token},
+    )
+    print("Video publicado en Facebook:", video_id)
+    if portada and portada.exists():
+        try:
+            cuerpo, tipo = _multipart_varios(
+                {"is_preferred": "true", "access_token": token}, [("source", "portada.jpg", portada.read_bytes(), "image/jpeg")]
+            )
+            req = urllib.request.Request(f"{API}/{video_id}/thumbnails", data=cuerpo, headers={"Content-Type": tipo})
+            with urllib.request.urlopen(req, timeout=120) as r:
+                print("Portada puesta:", r.read().decode()[:100])
+        except Exception as e:  # el video ya está publicado: sin portada propia no es grave
+            detalle = e.read().decode(errors="ignore")[:300] if hasattr(e, "read") else e
+            print("No se pudo poner la portada:", detalle)
+    return video_id
 
 
 def duracion(ruta_mp4) -> float:
