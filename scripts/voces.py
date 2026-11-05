@@ -163,7 +163,19 @@ def voz_gemini(texto: str, modelos: list[str]) -> bytes:
                 print(f"{modelos[0]} ocupado ({e}), esperando un minuto")
                 time.sleep(60)
             continue
-        audio = base64.b64decode(r["candidates"][0]["content"]["parts"][0]["inlineData"]["data"])
+        try:
+            audio = base64.b64decode(r["candidates"][0]["content"]["parts"][0]["inlineData"]["data"])
+        except (KeyError, IndexError, TypeError):
+            # Respuesta sin audio (filtro, corte del modelo...): se reintenta y, si insiste, otro modelo
+            motivo = (r.get("candidates") or [{}])[0].get("finishReason", "sin audio")
+            esperas += 1
+            print(f"{modelos[0]} respondió sin audio ({motivo})")
+            if esperas > 2:
+                modelos.pop(0)
+                esperas = 0
+            else:
+                time.sleep(10)
+            continue
         leida = leyo_indicacion(audio, texto) if con_estilo else False
         if leida is None:
             print("  no se puede escuchar el audio con Whisper: se narra sin indicación")
