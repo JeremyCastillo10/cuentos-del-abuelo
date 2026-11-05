@@ -1,0 +1,31 @@
+name: Borrar de Facebook
+
+# Borra una publicación o video de la página por su ID
+on:
+  workflow_dispatch:
+    inputs:
+      id:
+        description: "ID del video o publicación de Facebook"
+        required: true
+
+jobs:
+  borrar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+      FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+      ID: ${{ inputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Borrar
+        run: |
+          cd scripts && python3 -c "
+          import os, urllib.request, json
+          from facebook import API, token_pagina
+          req = urllib.request.Request(f'{API}/{os.environ[\"ID\"]}?access_token={token_pagina()}', method='DELETE')
+          print('Respuesta de Facebook:', urllib.request.urlopen(req, timeout=60).read().decode())
+          "
