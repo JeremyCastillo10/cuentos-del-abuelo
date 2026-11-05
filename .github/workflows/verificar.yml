@@ -20,6 +20,7 @@ jobs:
           # A qué página pertenece el token guardado (debe ser la misma que FB_PAGE_ID)
           curl -s "https://graph.facebook.com/v21.0/me?fields=id,name&access_token=$FB_PAGE_TOKEN" | python3 -c "import json,sys,os; d=json.load(sys.stdin); print('Token de:', d.get('name'), '| coincide con FB_PAGE_ID:', d.get('id') == os.environ['FB_PAGE_ID'], '' if d.get('id') else d)"
           curl -s "https://graph.facebook.com/v21.0/me/permissions?access_token=$FB_PAGE_TOKEN" | head -c 600; echo
+          curl -s "https://graph.facebook.com/v21.0/debug_token?input_token=$FB_PAGE_TOKEN&access_token=$FB_PAGE_TOKEN" | python3 -c "import json,sys,datetime; d=json.load(sys.stdin).get('data',{}); e=d.get('expires_at'); print('Vence:', 'nunca' if e==0 else datetime.datetime.utcfromtimestamp(e) if e else d)"
       - name: Instagram
         run: |
           curl -s "https://graph.facebook.com/v21.0/$IG_USER_ID?fields=username&access_token=$IG_ACCESS_TOKEN" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Instagram (graph.facebook):', d.get('username') or d)"
