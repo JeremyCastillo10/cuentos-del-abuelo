@@ -16,6 +16,10 @@ on:
         description: "Generar aunque hoy ya se haya publicado"
         type: boolean
         default: false
+      rehacer_de:
+        description: "ID de una ejecución anterior: rehace ese mismo guion (voz, imágenes y video nuevos)"
+        required: false
+        default: ""
       muestra:
         description: "Solo una muestra corta (primeras 12 escenas), sin publicar"
         type: boolean
@@ -52,6 +56,7 @@ jobs:
     timeout-minutes: 120
     permissions:
       contents: write
+      actions: read
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
@@ -79,8 +84,22 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
       - name: Dependencias de Chrome para Remotion
         run: npx remotion browser ensure
+      - name: Traer el guion a rehacer
+        if: inputs.rehacer_de != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: historia
+          run-id: ${{ inputs.rehacer_de }}
+          github-token: ${{ github.token }}
+          path: anterior
       - name: Historia
-        run: python scripts/historia.py
+        run: |
+          if [ -n "${{ inputs.rehacer_de }}" ]; then
+            # Mismo guion; se quitan el audio y las imágenes para generarlos de nuevo
+            python3 -c "import json; e=json.load(open('anterior/public/episodio.json')); e.pop('voz',None); e.pop('portada_foto',None); [ [s.pop(k,None) for k in ('audio','grupo','foto','video')] for s in e['escenas'] ]; json.dump(e, open('public/episodio.json','w'), ensure_ascii=False, indent=2); print('Rehaciendo:', e['titulo'])"
+          else
+            python scripts/historia.py
+          fi
       - name: Recortar para muestra
         if: inputs.muestra
         run: |
