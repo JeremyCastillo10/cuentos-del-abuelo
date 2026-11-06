@@ -128,7 +128,10 @@ def leyo_indicacion(pcm: bytes, texto: str) -> bool | None:
 
 
 # Si no se puede escuchar el audio con Whisper, no se usa indicación (así nunca se cuela en el audio)
-_verificable = {"ok": True}
+# La indicación de estilo ("narra con intriga...") a veces se cuela en el audio y no hay forma fiable de
+# comprobarlo (la transcripción falla o se salta esa parte). Por eso, por defecto, se narra SIN indicación:
+# la voz Algenib ya es grave y la emoción la da el propio texto. VOZ_CON_ESTILO=1 la vuelve a activar.
+_verificable = {"ok": os.environ.get("VOZ_CON_ESTILO") == "1"}
 
 
 def voz_gemini(texto: str, modelos: list[str]) -> bytes:
